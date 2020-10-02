@@ -195,7 +195,7 @@ if __name__ == "__main__":
     set_initial_config(robot, joint_id)
 
     # Joint Friction
-    # set_joint_friction(robot, joint_id, 1)
+    set_joint_friction(robot, joint_id, 1)
 
     #camera intrinsic parameter
     fov, aspect, nearval, farval = 60.0, 2.0, 0.1, 10
@@ -218,8 +218,8 @@ if __name__ == "__main__":
         # debug(robot, joint_id, link_id)
         command = interface.get_command(sensor_data)
         # __import__('ipdb').set_trace()
-        # set_motor_trq(robot, joint_id, command)
-        set_motor_pos(robot, joint_id, command)
+        set_motor_trq(robot, joint_id, command)
+        # set_motor_pos(robot, joint_id, command)
 
         p.stepSimulation()
 

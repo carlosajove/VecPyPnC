@@ -11,6 +11,7 @@ from pnc.wbc.manager.reaction_force_manager import ReactionForceManager
 from pnc.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
 from pnc.atlas_pnc.atlas_state_machine.double_support_stand import DoubleSupportStand
 from pnc.atlas_pnc.atlas_state_machine.double_support_balance import DoubleSupportBalance
+from pnc.atlas_pnc.atlas_state_provider import AtlasStateProvider
 
 
 class AtlasControlArchitecture(ControlArchitecture):

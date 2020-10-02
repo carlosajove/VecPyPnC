@@ -34,12 +34,12 @@ class WBCConfig(object):
     KP_UPPER_BODY = 50.
     KD_UPPER_BODY = 5.
 
-    KP_FOOT = np.array([100., 100., 100.])
-    KD_FOOT = np.array([10., 10., 10.])
+    KP_FOOT = np.array([400., 400., 400.])
+    KD_FOOT = np.array([40., 40., 40.])
 
     # Regularization terms
-    LAMBDA_Q_DDOT = 1e-6
-    LAMBDA_RF = 1e-6
+    LAMBDA_Q_DDOT = 1e-8
+    LAMBDA_RF = 1e-8
 
     B_TRQ_LIMIT = True
 

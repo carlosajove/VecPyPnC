@@ -71,7 +71,8 @@ class DoubleSupportStand(StateMachine):
             "floating_base"].update_floating_base_desired(self._sp._curr_time)
         # Update UpperBodyJoint Task
         self._trajectory_managers[
-            "upper_body"].use_nominal_upper_body_joint_pos()
+            "upper_body"].use_nominal_upper_body_joint_pos(
+                self._sp.nominal_joint_pos)
         # Update Foot Task
         self._trajectory_managers["lfoot"].use_current()
         self._trajectory_managers["rfoot"].use_current()
