@@ -41,9 +41,6 @@ def set_axes_equal(ax):
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
 
-'Conversion from quaternion to rotation matrix'
-
-
 def quat2mat(quat):
     quat = np.squeeze(np.asarray(quat))
     x, y, z, w = quat
