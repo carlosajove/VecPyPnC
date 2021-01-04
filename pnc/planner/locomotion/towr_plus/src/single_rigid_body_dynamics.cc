@@ -81,7 +81,7 @@ SingleRigidBodyDynamics::GetDynamicViolation() const {
 
   for (int ee = 0; ee < ee_pos_.size(); ++ee) {
     Vector3d f = ee_force_.at(ee);
-    tau_sum += f.cross(com_pos_ - ee_pos_.at(ee));
+    tau_sum += f.cross(com_pos_ - ee_pos_.at(ee)) + ee_trq_.at(ee);
     f_sum += f;
   }
 
@@ -168,6 +168,15 @@ SingleRigidBodyDynamics::GetJacobianWrtForce(const Jac &jac_force,
   Jac jac(k6D, n);
   jac.middleRows(AX, k3D) = -jac_tau;
   jac.middleRows(LX, k3D) = -jac_force;
+
+  return jac;
+}
+
+SingleRigidBodyDynamics::Jac
+SingleRigidBodyDynamics::GetJacobianWrtTrq(const Jac &jac_trq) const {
+  int n = jac_trq.cols();
+  Jac jac(k6D, n);
+  jac.middleRows(AX, k3D) = -jac_trq;
 
   return jac;
 }
