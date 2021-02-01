@@ -279,9 +279,8 @@ def _do_generate_data(n_data,
         np.random.seed(rseed)
 
     from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
-    robot_sys = PinocchioRobotSystem(
-        cwd + "/robot_model/atlas/atlas_v4_with_multisense.urdf",
-        cwd + "/robot_model/atlas", False, False)
+    robot_sys = PinocchioRobotSystem(cwd + "/robot_model/atlas/atlas.urdf",
+                                     cwd + "/robot_model/atlas", False, False)
 
     data_x, data_y = [], []
 
@@ -477,9 +476,9 @@ if __name__ == "__main__":
 
     # Create Robot, Ground
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-    robot = p.loadURDF(
-        cwd + "/robot_model/atlas/atlas_v4_with_multisense.urdf",
-        INITIAL_POS_WORLD_TO_BASEJOINT, INITIAL_QUAT_WORLD_TO_BASEJOINT)
+    robot = p.loadURDF(cwd + "/robot_model/atlas/atlas.urdf",
+                       INITIAL_POS_WORLD_TO_BASEJOINT,
+                       INITIAL_QUAT_WORLD_TO_BASEJOINT)
 
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
@@ -518,14 +517,12 @@ if __name__ == "__main__":
     if DYN_LIB == 'dart':
         from pnc.robot_system.dart_robot_system import DartRobotSystem
         robot_sys = DartRobotSystem(
-            cwd +
-            "/robot_model/atlas/atlas_v4_with_multisense_relative_path.urdf",
-            False, True)
+            cwd + "/robot_model/atlas/atlas_rel_path.urdf", False, True)
     elif DYN_LIB == 'pinocchio':
         from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
-        robot_sys = PinocchioRobotSystem(
-            cwd + "/robot_model/atlas/atlas_v4_with_multisense.urdf",
-            cwd + "/robot_model/atlas", False, True)
+        robot_sys = PinocchioRobotSystem(cwd + "/robot_model/atlas/atlas.urdf",
+                                         cwd + "/robot_model/atlas", False,
+                                         True)
     else:
         raise ValueError
 
