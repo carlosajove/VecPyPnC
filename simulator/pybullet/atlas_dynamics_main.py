@@ -101,7 +101,7 @@ if __name__ == "__main__":
         # Get SensorData
         if count % (SimConfig.CAMERA_DT / SimConfig.CONTROLLER_DT) == 0:
             camera_img = pybullet_util.get_camera_image_from_link(
-                robot, link_id['head'], 50,10,60.,0.1, 10)
+                robot, link_id['head'], 50, 10, 60., 0.1, 10)
         sensor_data = pybullet_util.get_sensor_data(robot, joint_id, link_id,
                                                     pos_basejoint_to_basecom,
                                                     rot_basejoint_to_basecom)
@@ -138,7 +138,7 @@ if __name__ == "__main__":
             print("ctrl computation time: ", end_time - start_time)
 
         # Apply Trq
-        pybullet_util.set_motor_trq(robot, joint_id, command)
+        pybullet_util.set_motor_trq(robot, joint_id, command['joint_trq'])
 
         # Save Image
         if (SimConfig.VIDEO_RECORD) and (count % SimConfig.RECORD_FREQ == 0):
