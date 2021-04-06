@@ -7,8 +7,8 @@ import copy
 
 import pybullet as p
 
-from pnc.interface import Interface
 from config.atlas_config import PnCConfig
+from pnc.interface import Interface
 from pnc.atlas_pnc.atlas_interrupt_logic import AtlasInterruptLogic
 from pnc.atlas_pnc.atlas_state_provider import AtlasStateProvider
 from pnc.atlas_pnc.atlas_state_estimator import AtlasStateEstimator

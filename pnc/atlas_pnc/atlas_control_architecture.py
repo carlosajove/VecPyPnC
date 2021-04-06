@@ -33,7 +33,7 @@ class AtlasControlArchitecture(ControlArchitecture):
         # Initialize Planner
         self._dcm_planner = DCMPlanner()
 
-        # In___itialize Task Manager
+        # Initialize Task Manager
         self._rfoot_tm = FootTrajectoryManager(
             self._taf_container.rfoot_pos_task,
             self._taf_container.rfoot_ori_task, robot)
