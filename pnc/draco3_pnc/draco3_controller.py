@@ -16,8 +16,6 @@ class Draco3Controller(object):
         self._wbc = Draco3IHWBC(self._robot, act_list, PnCConfig.SAVE_DATA)
         if WBCConfig.B_TRQ_LIMIT:
             self._wbc.trq_limit = self._robot.joint_trq_limit
-        else:
-            self._wbc.trq_limit = None
         self._wbc.lambda_q_ddot = WBCConfig.LAMBDA_Q_DDOT
         self._wbc.lambda_rf = WBCConfig.LAMBDA_RF
         self._wbc.lambda_if = WBCConfig.LAMBDA_IF
@@ -33,7 +31,6 @@ class Draco3Controller(object):
         self._b_first_visit = True
 
     def get_command(self):
-
         if self._b_first_visit:
             self.first_visit()
 
@@ -57,7 +54,6 @@ class Draco3Controller(object):
         joint_trq_cmd, joint_acc_cmd, rf_cmd, if_cmd = self._wbc.solve(
             self._tf_container.task_list, self._tf_container.contact_list,
             False)
-        # exit()
         # Double integration
         joint_vel_cmd, joint_pos_cmd = self._joint_integrator.integrate(
             joint_acc_cmd, self._robot.joint_velocities,

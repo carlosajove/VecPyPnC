@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-np.set_printoptions(precision=6, threshold=sys.maxsize)
+np.set_printoptions(precision=2, threshold=sys.maxsize)
 from scipy.linalg import block_diag
 from qpsolvers import solve_qp
 
@@ -150,15 +150,15 @@ class IHWBC(object):
             cost_mat = np.copy(cost_t_mat)
             cost_vec = np.copy(cost_t_vec)
 
-        if verbose:
-            print("cost_t_mat")
-            print(cost_t_mat)
-            print("cost_t_vec")
-            print(cost_t_vec)
-            print("cost_rf_mat")
-            print(cost_rf_mat)
-            print("cost_rf_vec")
-            print(cost_rf_vec)
+        # if verbose:
+        # print("cost_t_mat")
+        # print(cost_t_mat)
+        # print("cost_t_vec")
+        # print(cost_t_vec)
+        # print("cost_rf_mat")
+        # print(cost_rf_mat)
+        # print("cost_rf_vec")
+        # print(cost_rf_vec)
 
         # ======================================================================
         # Equality Constraint

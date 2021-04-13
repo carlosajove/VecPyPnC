@@ -156,11 +156,6 @@ if __name__ == "__main__":
             start_time = time.time()
         command = interface.get_command(copy.deepcopy(sensor_data))
 
-        print("count :", count)
-        print(command['joint_trq'])
-        if count == 3:
-            exit()
-
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)

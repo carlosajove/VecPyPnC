@@ -18,12 +18,21 @@ class Draco3TaskForceContainer(TaskForceContainer):
         self._com_task.kp = WBCConfig.KP_COM
         self._com_task.kd = WBCConfig.KD_COM
         self._com_task.w_hierarchy = WBCConfig.W_COM
-        # Torso Task
+
+        # Torso position task
+        # self._torso_pos_task = BasicTask(robot, "LINK_XYZ", 3,
+        # 'torso_com_link', PnCConfig.SAVE_DATA)
+        # self._torso_pos_task.kp = WBCConfig.KP_COM
+        # self._torso_pos_task.kd = WBCConfig.KD_COM
+        # self._torso_pos_task.w_hierarchy = WBCConfig.W_COM
+
+        # Torso orientation task
         self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3,
                                          "torso_com_link", PnCConfig.SAVE_DATA)
         self._torso_ori_task.kp = WBCConfig.KP_TORSO
         self._torso_ori_task.kd = WBCConfig.KD_TORSO
         self._torso_ori_task.w_hierarchy = WBCConfig.W_TORSO
+
         # Upperbody joints
         upperbody_joint = [
             'neck_pitch', 'l_shoulder_fe', 'l_shoulder_aa', 'l_shoulder_ie',
@@ -34,29 +43,31 @@ class Draco3TaskForceContainer(TaskForceContainer):
         self._upper_body_task = BasicTask(robot, "SELECTED_JOINT",
                                           len(upperbody_joint),
                                           upperbody_joint, PnCConfig.SAVE_DATA)
-        self._upper_body_task.kp = np.array([WBCConfig.KP_UPPER_BODY] *
-                                            self._upper_body_task.dim)
-        self._upper_body_task.kd = np.array([WBCConfig.KD_UPPER_BODY] *
-                                            self._upper_body_task.dim)
+        self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY
+        self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY
         self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY
+
         # Rfoot Pos Task
         self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._rfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+
         # Lfoot Pos Task
         self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
         self._lfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._lfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+
         # Rfoot Ori Task
         self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._rfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+
         # Lfoot Ori Task
         self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
@@ -69,6 +80,11 @@ class Draco3TaskForceContainer(TaskForceContainer):
             self._rfoot_pos_task, self._lfoot_pos_task, self._rfoot_ori_task,
             self._lfoot_ori_task
         ]
+        # self._task_list = [
+        # self._torso_pos_task, self._torso_ori_task, self._upper_body_task,
+        # self._rfoot_pos_task, self._lfoot_pos_task, self._rfoot_ori_task,
+        # self._lfoot_ori_task
+        # ]
 
         # ======================================================================
         # Initialize Contact
@@ -87,6 +103,10 @@ class Draco3TaskForceContainer(TaskForceContainer):
     @property
     def com_task(self):
         return self._com_task
+
+    # @property
+    # def torso_pos_task(self):
+    # return self._torso_pos_task
 
     @property
     def torso_ori_task(self):

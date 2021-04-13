@@ -28,12 +28,12 @@ class PnCConfig(object):
 
 class WBCConfig(object):
     # Max normal force per contact
-    RF_Z_MAX = 1000.0
+    RF_Z_MAX = 500.0
 
     # Task Hierarchy Weights
     W_COM = 10.0
     W_TORSO = 20.0
-    W_UPPER_BODY = 20.0
+    W_UPPER_BODY = 40.0
     W_CONTACT_FOOT = 60.0
     W_SWING_FOOT = 40.0
 
@@ -44,20 +44,28 @@ class WBCConfig(object):
     KP_TORSO = np.array([100., 100., 100])
     KD_TORSO = np.array([10., 10., 10.])
 
-    KP_UPPER_BODY = 100.
-    KD_UPPER_BODY = 10.
+    # ['neck_pitch', 'l_shoulder_fe', 'l_shoulder_aa', 'l_shoulder_ie',
+    # 'l_elbow_fe', 'l_wrist_ps', 'l_wrist_pitch', 'r_shoulder_fe',
+    # 'r_shoulder_aa', 'r_shoulder_ie', 'r_elbow_fe', 'r_wrist_ps',
+    # 'r_wrist_pitch'
+    # ]
+    KP_UPPER_BODY = np.array(
+        [20., 80., 80., 80., 30., 20., 20., 80., 80., 80., 30., 20., 20.])
+    KD_UPPER_BODY = np.array(
+        [2., 8., 8., 8., 3., 2., 2., 8., 8., 8., 3., 2., 2.])
 
-    KP_FOOT_POS = np.array([400., 400., 400.])
-    KD_FOOT_POS = np.array([40., 40., 40.])
-    KP_FOOT_ORI = np.array([400., 400., 400.])
-    KD_FOOT_ORI = np.array([40., 40., 40.])
+    KP_FOOT_POS = np.array([100., 100., 100.])
+    KD_FOOT_POS = np.array([10., 10., 10.])
+    KP_FOOT_ORI = np.array([100., 100., 100.])
+    KD_FOOT_ORI = np.array([10., 10., 10.])
 
     # Regularization terms
     LAMBDA_Q_DDOT = 1e-8
     LAMBDA_RF = 1e-7
     LAMBDA_IF = 1e-6
 
-    B_TRQ_LIMIT = True
+    # B_TRQ_LIMIT = True
+    B_TRQ_LIMIT = False
 
     # Integration Parameters
     VEL_CUTOFF_FREQ = 2.0  #Hz
