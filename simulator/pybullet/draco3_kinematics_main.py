@@ -37,16 +37,28 @@ def set_initial_config(robot, joint_id):
     p.resetJointState(robot, joint_id["l_elbow_fe"], -np.pi / 2, 0.)
     p.resetJointState(robot, joint_id["r_shoulder_aa"], -np.pi / 6, 0.)
     p.resetJointState(robot, joint_id["r_elbow_fe"], -np.pi / 2, 0.)
+    p.resetJointState(robot, joint_id["l_wrist_ps"], np.pi / 6, 0.)
+    p.resetJointState(robot, joint_id["r_wrist_ps"], -np.pi / 6, 0.)
 
     # Lowerbody
+    hip_yaw_angle = 5
+    p.resetJointState(robot, joint_id["l_hip_aa"], np.radians(hip_yaw_angle),
+                      0.)
     p.resetJointState(robot, joint_id["l_hip_fe"], -np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["l_knee_fe_jp"], np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["l_knee_fe_jd"], np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["l_ankle_fe"], -np.pi / 4, 0.)
+    p.resetJointState(robot, joint_id["l_ankle_ie"],
+                      np.radians(-hip_yaw_angle), 0.)
+
+    p.resetJointState(robot, joint_id["r_hip_aa"], np.radians(-hip_yaw_angle),
+                      0.)
     p.resetJointState(robot, joint_id["r_hip_fe"], -np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["r_knee_fe_jp"], np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["r_knee_fe_jd"], np.pi / 4, 0.)
     p.resetJointState(robot, joint_id["r_ankle_fe"], -np.pi / 4, 0.)
+    p.resetJointState(robot, joint_id["r_ankle_ie"], np.radians(hip_yaw_angle),
+                      0.)
 
 
 def signal_handler(signal, frame):
@@ -128,6 +140,10 @@ if __name__ == "__main__":
         robot, joint_id, link_id, pos_basejoint_to_basecom,
         rot_basejoint_to_basecom)
 
+    # Draw Camera Link
+    pybullet_util.draw_link_frame(robot, link_id['r_camera'], text="r_camera")
+    pybullet_util.draw_link_frame(robot, link_id['l_camera'], text="l_camera")
+
     # Add debug parameters
     param_ids = []
     for k, v in joint_id.items():
@@ -139,7 +155,11 @@ if __name__ == "__main__":
 
         # Get SensorData
         if count % (CAMERA_DT / CONTROLLER_DT) == 0:
-            pass  ## TODO(SH)
+            l_camera_img = pybullet_util.get_camera_image_from_link(
+                robot, link_id['l_camera'], 50, 10, 60., 0.1, 10)
+            # r_camera_img = pybullet_util.get_camera_image_from_link(
+            # robot, link_id['r_camera'], 50, 10, 60., 0.1, 10)
+
         sensor_data = pybullet_util.get_sensor_data(robot, joint_id, link_id,
                                                     pos_basejoint_to_basecom,
                                                     rot_basejoint_to_basecom)
