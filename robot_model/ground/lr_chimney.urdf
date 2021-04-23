@@ -29,7 +29,7 @@
   </link>
 
   <joint name="first_to_second" type="fixed">
-    <origin rpy="0 0 0" xyz="0.2826 0 0.08"/>
+    <origin rpy="0 0 0" xyz="0.329 0 0.08"/>
     <parent link="first_ground"/>
     <child link="second_ground"/>
   </joint>
@@ -49,7 +49,7 @@
   </link>
 
   <joint name="first_to_third" type="fixed">
-    <origin rpy="0 0 0" xyz="0.622 0 0.08"/>
+    <origin rpy="0 0 0" xyz="0.756 0 0.08"/>
     <parent link="first_ground"/>
     <child link="third_ground"/>
   </joint>
@@ -69,7 +69,7 @@
   </link>
 
   <joint name="first_to_fourth" type="fixed">
-    <origin rpy="0 0 0" xyz="0.93 0 0"/>
+    <origin rpy="0 0 0" xyz="1.1 0 0"/>
     <parent link="first_ground"/>
     <child link="fourth_ground"/>
   </joint>
