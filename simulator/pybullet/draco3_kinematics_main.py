@@ -1,5 +1,6 @@
 import os
 import sys
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 import time, math
@@ -11,6 +12,7 @@ import shutil
 import cv2
 import pybullet as p
 import numpy as np
+
 np.set_printoptions(precision=2)
 
 from util import pybullet_util
