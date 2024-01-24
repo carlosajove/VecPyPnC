@@ -6,6 +6,8 @@ import json
 import multiprocessing as mp
 from tqdm import tqdm
 
+import torch 
+
 
 def pretty_print(ob):
     print(json.dumps(ob, indent=4))
@@ -71,6 +73,19 @@ def quat_to_exp(quat):
 
     return np.copy(ret * theta)
 
+def quat_to_exp_pytorch(quat):
+    img_vec = torch.tensor([quat[0], quat[1], quat[2]])
+    w = quat[3]
+    theta = 2.0 * torch.asin(
+        torch.sqrt(img_vec[0] * img_vec[0] + img_vec[1] * img_vec[1] +
+                img_vec[2] * img_vec[2]))
+
+    if torch.abs(theta) < 1e-4:
+        return torch.zeros(3)
+    ret = img_vec / torch.sin(theta / 2.0)
+
+    return torch.clone(ret * theta).detach()
+
 
 def exp_to_quat(exp):
     theta = np.sqrt(exp[0] * exp[0] + exp[1] * exp[1] + exp[2] * exp[2])
@@ -94,6 +109,11 @@ def weighted_pinv(A, W, rcond=1e-15):
         np.dot(A.transpose(),
                np.linalg.pinv(np.dot(np.dot(A, W), A.transpose()), rcond)))
 
+def weighted_pinv_pytorch(A, W, rtol=1e-15):
+    return torch.matmul(
+        W,
+        torch.matmul(A.t(),
+               torch.linalg.pinv(torch.matmul(torch.matmul(A, W), A.t()), rtol=rtol)))
 
 def get_sinusoid_trajectory(start_time, mid_point, amp, freq, eval_time):
     dim = amp.shape[0]
@@ -183,7 +203,7 @@ def try_multiprocess(args_list, num_cpu, f, max_timeouts=1):
 
 
 def prevent_quat_jump(quat_des, quat_act):
-    # print("quat_des:",quat_des)
+    #print("quat_des:",quat_des)
     # print("quat_act:",quat_act)
     a = quat_des - quat_act
     b = quat_des + quat_act
@@ -194,6 +214,19 @@ def prevent_quat_jump(quat_des, quat_act):
 
     return new_quat_act
 
+def prevent_quat_jump_pytorch(quat_des, quat_act):
+    # print("quat_des:",quat_des)
+    # print("quat_act:",quat_act)
+    a = quat_des - quat_act
+    b = quat_des + quat_act
+    """CARLOS"""
+    #probaly better to change to torch.linalg.vector_norm()
+    if torch.linalg.norm(a) > torch.linalg.norm(b):
+        new_quat_act = -quat_act
+    else:
+        new_quat_act = quat_act
+
+    return new_quat_act
 
 def is_colliding_3d(start, goal, min, max, threshold, N):
     for i in range(3):

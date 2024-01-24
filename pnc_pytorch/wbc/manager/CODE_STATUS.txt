@@ -1,0 +1,13 @@
+DONE:
+-task_hierarchy_manager.py
+-upper_body_trajectory_manager.py
+-erased:all other trajecotry managers
+
+TODO:
+- Mytrajectory_manager.py
+- must include the upper body trajectory manager
+
+
+
+
+QUESTIONS:

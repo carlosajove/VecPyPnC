@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from pnc.atlas_pnc.atlas_state_provider import AtlasStateProvider
 
@@ -15,10 +16,10 @@ class UpperBodyTrajectoryManager(object):
         nominal_joint_pos (OrderedDict):
             Nominal joint positions
         """
-        joint_pos_des = np.array(
+        joint_pos_des = torch.tensor(
             [nominal_joint_pos[k] for k in self._upper_body_task.target_id])
-        joint_vel_des, joint_acc_des = np.zeros_like(
-            joint_pos_des), np.zeros_like(joint_pos_des)
+        joint_vel_des, joint_acc_des = torch.zeros_like(
+            joint_pos_des), torch.zeros_like(joint_pos_des)
 
         self._upper_body_task.update_desired(joint_pos_des, joint_vel_des,
                                              joint_acc_des)

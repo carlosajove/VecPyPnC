@@ -2,6 +2,7 @@ import abc
 from collections import OrderedDict
 
 import numpy as np
+import torch
 
 from util import util as util
 
@@ -56,9 +57,9 @@ class RobotSystem(abc.ABC):
         self._joint_positions = None
         self._joint_velocities = None
 
-        self._Ig = np.zeros((6, 6))
-        self._Ag = np.zeros((6, self._n_q_dot))
-        self._hg = np.zeros(6)
+        self._Ig = torch.zeros((6, 6))
+        self._Ag = torch.zeros((6, self._n_q_dot))
+        self._hg = torch.zeros(6)
 
     @property
     def n_floating(self):

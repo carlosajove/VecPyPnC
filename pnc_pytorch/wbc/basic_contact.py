@@ -4,7 +4,7 @@ import sys
 cwd = os.getcwd()
 sys.path.append(cwd)
 
-import numpy as np
+import torch
 
 from pnc.wbc.contact import Contact
 from pnc.data_saver import DataSaver
@@ -28,8 +28,8 @@ class PointContact(Contact):
             self._link_id)[self._dim_contact:]
 
     def _update_cone_constraint(self):
-        rot = self._robot.get_link_iso(self._link_id)[0:3, 0:3].transpose()
-        self._cone_constraint_mat = np.zeros((6, self._dim_contact))
+        rot = self._robot.get_link_iso(self._link_id)[0:3, 0:3].t()
+        self._cone_constraint_mat = torch.zeros((6, self._dim_contact))
         self._cone_constraint_mat[0, 2] = 1.
 
         self._cone_constraint_mat[1, 0] = 1.
@@ -44,7 +44,7 @@ class PointContact(Contact):
 
         self._cone_constraint_mat[5, 2] = -1.
 
-        self._cone_constraint_vec = np.zeros(6)
+        self._cone_constraint_vec = torch.zeros(6)
         self._cone_constraint_vec[5] = -self._rf_z_max
 
         if self._b_data_save:
@@ -70,24 +70,24 @@ class SurfaceContact(Contact):
             self._link_id)
 
     def _update_cone_constraint(self):
-        self._cone_constraint_mat = np.zeros((16 + 2, self._dim_contact))
+        self._cone_constraint_mat = torch.zeros((16 + 2, self._dim_contact))
 
         u = self._get_u(self._x, self._y, self._mu)
         rot = self._robot.get_link_iso(self._link_id)[0:3, 0:3]
-        rot_foot = np.zeros((6, 6))
-        rot_foot[0:3, 0:3] = rot.transpose()
-        rot_foot[3:6, 3:6] = rot.transpose()
+        rot_foot = torch.zeros((6, 6))
+        rot_foot[0:3, 0:3] = rot.t()
+        rot_foot[3:6, 3:6] = rot.t()
 
-        self._cone_constraint_mat = np.dot(u, rot_foot)
+        self._cone_constraint_mat = torch.matmul(u, rot_foot)
 
-        self._cone_constraint_vec = np.zeros(16 + 2)
+        self._cone_constraint_vec = torch.zeros(16 + 2)
         self._cone_constraint_vec[17] = -self._rf_z_max
 
         if self._b_data_save:
             self._data_saver.add("rf_z_max_" + self._link_id, self._rf_z_max)
 
     def _get_u(self, x, y, mu):
-        u = np.zeros((16 + 2, 6))
+        u = torch.zeros((16 + 2, 6))
 
         u[0, 5] = 1.
 

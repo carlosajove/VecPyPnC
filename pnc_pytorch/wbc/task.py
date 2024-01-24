@@ -1,6 +1,6 @@
 import abc
-import numpy as np
 
+import torch
 
 class Task(abc.ABC):
     """
@@ -15,18 +15,18 @@ class Task(abc.ABC):
 
         self._w_hierarchy = 1.0
 
-        self._kp = np.zeros(self._dim)
-        self._kd = np.zeros(self._dim)
+        self._kp = torch.zeros(self._dim)
+        self._kd = torch.zeros(self._dim)
 
-        self._jacobian = np.zeros((self._dim, self._robot.n_q_dot))
-        self._jacobian_dot_q_dot = np.zeros(self._dim)
+        self._jacobian = torch.zeros((self._dim, self._robot.n_q_dot))
+        self._jacobian_dot_q_dot = torch.zeros(self._dim)
 
-        self._op_cmd = np.zeros(self._dim)
-        self._pos_err = np.zeros(self._dim)
+        self._op_cmd = torch.zeros(self._dim)
+        self._pos_err = torch.zeros(self._dim)
 
-        self._pos_des = np.zeros(self._dim)
-        self._vel_des = np.zeros(self._dim)
-        self._acc_des = np.zeros(self._dim)
+        self._pos_des = torch.zeros(self._dim)
+        self._vel_des = torch.zeros(self._dim)
+        self._acc_des = torch.zeros(self._dim)
 
     @property
     def op_cmd(self):

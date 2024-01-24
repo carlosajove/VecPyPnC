@@ -1,4 +1,4 @@
-name: pypnc
+name: pypnc_pytorch
 channels:
   - anaconda
   - conda-forge
@@ -24,4 +24,5 @@ dependencies:
       - yapf==0.30.0
       - open3d
       - imageio
+      - torch
 prefix: /home/seunghyeonbang/anaconda3/envs/pypnc
