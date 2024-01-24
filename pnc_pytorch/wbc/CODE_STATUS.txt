@@ -1,0 +1,30 @@
+DONE:
+-contact
+-basic_contact
+-task
+-basic_task
+-internal_constraints
+-util:
+    -prevent_quat_jump_pytorch
+    -quat_to_exp_pytorch
+
+
+TODO:
+- check abc library for compatibility
+- check pickle library and os
+- check data saver: add function
+- change robot source code: example:
+            - get link jacobian
+            - get_link_jacobian_dot_times_qdot
+            - get link iso
+- Scipy functions: 
+    - scipy.spatial.transform.Rotation  (class)  -> basic_task
+            - from_quat
+            - from_matrix
+
+        
+
+QUESTIONS:
+-check abc library for compatibility
+-use of clone vs deepcopy. Right know using torch.clone
+-also different of np.copy()

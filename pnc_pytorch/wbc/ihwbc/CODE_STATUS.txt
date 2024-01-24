@@ -1,0 +1,17 @@
+DONE:
+- changed numpy to pytorch, assuming function inputs are torch
+- created funciton in utils
+
+TODO:
+- create equivalent to scipy.linalg.block_diagram, using pytorch
+- check data_saver function (self.data_saver.add())
+- implement torch compatible solver 
+
+QUESTIONS:
+- feedback .detach(). when using torch.clone(). Using detach doesn't propagate the gradients to the clone input
+  I understand this doesn't have any effect since we are not performing any backward pass
+  Since we are not trying to do any optimization on the WBC
+- What are we doing about prints and data saves
+
+- actually the data structure doesn't matter. What matters is that the operations performed are supported in gpu
+  pytorch performes the operations in gpu. Is data stored on the gpu?

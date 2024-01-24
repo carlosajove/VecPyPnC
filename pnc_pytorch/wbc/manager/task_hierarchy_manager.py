@@ -1,5 +1,4 @@
-import numpy as np
-
+import torch
 
 class TaskHierarchyManager(object):
     def __init__(self, task, w_max, w_min):
@@ -21,14 +20,14 @@ class TaskHierarchyManager(object):
         self._w_starting = self._task.w_hierarchy
 
     def update_ramp_to_min(self, current_time):
-        t = np.clip(current_time, self._start_time,
+        t = torch.clamp(current_time, self._start_time,
                     self._start_time + self._duration)
         self._task.w_hierarchy = (self._w_min -
                                   self._w_starting) / self._duration * (
                                       t - self._start_time) + self._w_starting
 
     def update_ramp_to_max(self, current_time):
-        t = np.clip(current_time, self._start_time,
+        t = torch.clamp(current_time, self._start_time,
                     self._start_time + self._duration)
         self._task.w_hierarchy = (self._w_max -
                                   self._w_starting) / self._duration * (

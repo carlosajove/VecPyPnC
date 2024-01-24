@@ -1,0 +1,11 @@
+DONE:
+- robot_system
+
+
+TODO:
+- Uses OrderedDict from collections. Check gpu compatibility
+- Pinocchio_robot_system.py
+
+QUESTION:
+- List operations where are executed.
+- Are we going to use pinnochio robot system? C++ code. Python API

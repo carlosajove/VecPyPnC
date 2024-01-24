@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import torch
 
 np.set_printoptions(precision=2, threshold=sys.maxsize)
 from scipy.linalg import block_diag
@@ -16,17 +17,17 @@ class IHWBC(object):
     Usage:
         update_setting --> solve
     """
-    def __init__(self, sf, sa, sv, data_save=False):
+    def __init__(self, sf, sa, sv, data_save=False):  #check for sf, sa, sv types must be torch tensors
 
-        self._n_q_dot = sa.shape[1]
+        self._n_q_dot = sa.shape[1]   #Shape works equal in pytorch
         self._n_active = sa.shape[0]
         self._n_passive = sv.shape[0]
 
         self._sf = sf
-        self._snf = np.concatenate((np.zeros(
+        self._snf = torch.cat((torch.zeros(
             (self._n_active + self._n_passive, 6)),
-                                    np.eye(self._n_active + self._n_passive)),
-                                   axis=1)
+                                    torch.eye(self._n_active + self._n_passive)),
+                                   dim=1)
         self._sa = sa
         self._sv = sv
 
@@ -38,7 +39,7 @@ class IHWBC(object):
 
         self._b_data_save = data_save
         if self._b_data_save:
-            self._data_saver = DataSaver()
+            self._data_saver = DataSaver()    #check data saver
 
     @property
     def trq_limit(self):
@@ -63,7 +64,10 @@ class IHWBC(object):
     @trq_limit.setter
     def trq_limit(self, val):
         assert val.shape[0] == self._n_active
-        self._trq_limit = np.copy(val)
+        self._trq_limit = torch.clone(val).detach() 
+        #This function is differentiable, 
+        # so gradients will flow back from the result of this operation to input. 
+        #To create a tensor without an autograd relationship to input see detach().
 
     @lambda_q_ddot.setter
     def lambda_q_ddot(self, val):
@@ -81,11 +85,15 @@ class IHWBC(object):
     def w_rf(self, val):
         self._w_rf = val
 
+    """Carlos"""
+    #the following must be torch tensors:
+    #all inputs of update_setting
+
     def update_setting(self, mass_matrix, mass_matrix_inv, coriolis, gravity):
-        self._mass_matrix = np.copy(mass_matrix)
-        self._mass_matrix_inv = np.copy(mass_matrix_inv)
-        self._coriolis = np.copy(coriolis)
-        self._gravity = np.copy(gravity)
+        self._mass_matrix = torch.clone(mass_matrix).detach()
+        self._mass_matrix_inv = torch.clone(mass_matrix_inv).detach()
+        self._coriolis = torch.clone(coriolis).detach()
+        self._gravity = torch.clone(gravity).detach()
 
     def solve(self,
               task_list,
@@ -121,28 +129,39 @@ class IHWBC(object):
         # Internal Constraint
         #   Set ni, jit_lmd_jidot_qdot, sa_ni_trc_bar_tr, and b_internal_constraint
         # ======================================================================
-        if len(internal_constraint_list) > 0:
-            ji = np.concatenate(
+
+        """CARLOS"""
+        #the following must be torch tensors:
+        #ic.jacobian 
+        #ic.jacobian_dot_q_dot
+        #ji 
+        #self._mass_matrix_inv
+        #self._sa
+
+        if len(internal_constraint_list) > 0:  
+            ji = torch.cat(
                 [ic.jacobian for ic in internal_constraint_list], axis=0)
-            jidot_qdot = np.concatenate(
+            jidot_qdot = torch.cat(
                 [ic.jacobian_dot_q_dot for ic in internal_constraint_list],
                 axis=0)
-            lmd = np.linalg.pinv(
-                np.dot(np.dot(ji, self._mass_matrix_inv), ji.transpose()))
-            ji_bar = np.dot(np.dot(self._mass_matrix_inv, ji.transpose()), lmd)
-            ni = np.eye(self._n_q_dot) - np.dot(ji_bar, ji)
-            jit_lmd_jidot_qdot = np.squeeze(
-                np.dot(np.dot(ji.transpose(), lmd), jidot_qdot))
-            sa_ni_trc = np.dot(self._sa, ni)[:, 6:]
-            sa_ni_trc_bar = util.weighted_pinv(sa_ni_trc,
+            lmd = torch.linalg.pinv(
+                torch.matmul(torch.matmul(ji, self._mass_matrix_inv), ji.t()))
+            ji_bar = torch.matmul(torch.matmul(self._mass_matrix_inv, ji.t()), lmd)
+            ni = torch.eye(self._n_q_dot) - torch.matmul(ji_bar, ji)
+            jit_lmd_jidot_qdot = torch.squeeze(
+                torch.matmul(torch.matmul(ji.t(), lmd), jidot_qdot))
+            sa_ni_trc = torch.matmul(self._sa, ni)[:, 6:]
+            """Carlos """
+            #util.weighted_pinv
+            sa_ni_trc_bar = util.weighted_pinv_pytorch(sa_ni_trc,
                                                self._mass_matrix_inv[6:, 6:])
-            sa_ni_trc_bar_tr = sa_ni_trc_bar.transpose()
+            sa_ni_trc_bar_tr = sa_ni_trc_bar.t()
             b_internal_constraint = True
         else:
-            ni = np.eye(self._n_q_dot)
-            jit_lmd_jidot_qdot = np.zeros(self._n_q_dot)
-            sa_ni_trc_bar = np.eye(self._n_active)
-            sa_ni_trc_bar_tr = sa_ni_trc_bar.transpose()
+            ni = torch.eye(self._n_q_dot)
+            jit_lmd_jidot_qdot = torch.zeros(self._n_q_dot)
+            sa_ni_trc_bar = torch.eye(self._n_active)
+            sa_ni_trc_bar_tr = sa_ni_trc_bar.t()
             b_internal_constraint = False
 
         # print("ni")
@@ -156,8 +175,14 @@ class IHWBC(object):
         # ======================================================================
         # Cost
         # ======================================================================
-        cost_t_mat = np.zeros((self._n_q_dot, self._n_q_dot))
-        cost_t_vec = np.zeros(self._n_q_dot)
+        cost_t_mat = torch.zeros((self._n_q_dot, self._n_q_dot))
+        cost_t_vec = torch.zeros(self._n_q_dot)
+        """CARLOS"""
+        #the following must be torch tensors:
+        #task.jacobian
+        #task.jacobian_dot_q_dot
+        #task.op_cmd
+        #contact_list elements
 
         for i, task in enumerate(task_list):
             j = task.jacobian
@@ -168,39 +193,55 @@ class IHWBC(object):
                 print(task.target_id, " task")
                 task.debug()
 
-            cost_t_mat += self._w_hierarchy[i] * np.dot(j.transpose(), j)
-            cost_t_vec += self._w_hierarchy[i] * np.dot(
-                (j_dot_q_dot - x_ddot).transpose(), j)
+            cost_t_mat += self._w_hierarchy[i] * torch.matmul(j.t(), j)
+            cost_t_vec += self._w_hierarchy[i] * torch.matmul(
+                (j_dot_q_dot - x_ddot).t(), j)
         # cost_t_mat += self._lambda_q_ddot * np.eye(self._n_q_dot)
         cost_t_mat += self._lambda_q_ddot * self._mass_matrix
 
+        """CARLOS"""
+        #block_diag is a scipy function uses numpy 
+        #Need to build the function myself in torch
         if contact_list is not None:
+
+            """
+            CARLOS
+            BUILD OWN BLOCK DIAGRAM
+            """
             uf_mat = np.array(
-                block_diag(
+                block_diag(     
                     *[contact.cone_constraint_mat
-                      for contact in contact_list]))
-            uf_vec = np.concatenate(
+                      for contact in contact_list])) 
+
+
+            uf_vec = torch.cat(
                 [contact.cone_constraint_vec for contact in contact_list])
-            contact_jacobian = np.concatenate(
+            contact_jacobian = torch.cat(
                 [contact.jacobian for contact in contact_list], axis=0)
 
             assert uf_mat.shape[0] == uf_vec.shape[0]
             assert uf_mat.shape[1] == contact_jacobian.shape[0]
             dim_cone_constraint, dim_contacts = uf_mat.shape
 
-            cost_rf_mat = (self._lambda_rf + self._w_rf) * np.eye(dim_contacts)
+            cost_rf_mat = (self._lambda_rf + self._w_rf) * torch.eye(dim_contacts)
             if rf_des is None:
-                rf_des = np.zeros(dim_contacts)
-            cost_rf_vec = -self._w_rf * np.copy(rf_des)
+                rf_des = torch.zeros(dim_contacts)
+            cost_rf_vec = -self._w_rf * torch.clone(rf_des).detach()
 
+            """
+            CARLOS
+            BUILD OWN BLOCK DIAGRAM
+            """
             cost_mat = np.array(block_diag(
                 cost_t_mat, cost_rf_mat))  # (nqdot+nc, nqdot+nc)
-            cost_vec = np.concatenate([cost_t_vec, cost_rf_vec])  # (nqdot+nc,)
+
+
+            cost_vec = torch.cat([cost_t_vec, cost_rf_vec])  # (nqdot+nc,)
 
         else:
             dim_contacts = dim_cone_constraint = 0
-            cost_mat = np.copy(cost_t_mat)
-            cost_vec = np.copy(cost_t_vec)
+            cost_mat = torch.clone(cost_t_mat).detach()
+            cost_vec = torch.clone(cost_t_vec).detach()
 
         # if verbose:
         # print("==================================")
@@ -222,31 +263,35 @@ class IHWBC(object):
         # Equality Constraint
         # ======================================================================
 
+        """CARLOS"""
+        #the following must be torch tensors:
+        #self._sf
+        
         if contact_list is not None:
-            eq_floating_mat = np.concatenate(
-                (np.dot(self._sf, self._mass_matrix),
-                 -np.dot(self._sf,
-                         np.dot(contact_jacobian, ni).transpose())),
-                axis=1)  # (6, nqdot+nc)
+            eq_floating_mat = torch.cat(
+                (torch.matmul(self._sf, self._mass_matrix),
+                 -torch.matmul(self._sf,
+                         torch.matmul(contact_jacobian, ni).t())),
+                dim=1)  # (6, nqdot+nc)
             if b_internal_constraint:
-                eq_int_mat = np.concatenate(
-                    (ji, np.zeros(
-                        (ji.shape[0], dim_contacts))), axis=1)  # (2, nqdot+nc)
-                eq_int_vec = np.zeros(ji.shape[0])
+                eq_int_mat = torch.cat(
+                    (ji, torch.zeros(
+                        (ji.shape[0], dim_contacts))), dim=1)  # (2, nqdot+nc)
+                eq_int_vec = torch.zeros(ji.shape[0])
         else:
-            eq_floating_mat = np.dot(self._sf, self._mass_matrix)
+            eq_floating_mat = torch.matmul(self._sf, self._mass_matrix)
             if b_internal_constraint:
-                eq_int_mat = np.copy(ji)
-                eq_int_vec = np.zeros(ji.shape[0])
-        eq_floating_vec = -np.dot(
-            self._sf, np.dot(ni.transpose(), (self._coriolis + self._gravity)))
+                eq_int_mat = torch.clone(ji).detach()
+                eq_int_vec = torch.zeros(ji.shape[0])
+        eq_floating_vec = -torch.matmul(
+            self._sf, torch.matmul(ni.t(), (self._coriolis + self._gravity)))
 
         if b_internal_constraint:
-            eq_mat = np.concatenate((eq_floating_mat, eq_int_mat), axis=0)
-            eq_vec = np.concatenate((eq_floating_vec, eq_int_vec), axis=0)
+            eq_mat = torch.cat((eq_floating_mat, eq_int_mat), dim=0)
+            eq_vec = torch.cat((eq_floating_vec, eq_int_vec), dim=0)
         else:
-            eq_mat = np.copy(eq_floating_mat)
-            eq_vec = np.copy(eq_floating_vec)
+            eq_mat = torch.clone(eq_floating_mat).detach()
+            eq_vec = torch.clone(eq_floating_vec).detach()
 
         # ======================================================================
         # Inequality Constraint
@@ -254,9 +299,9 @@ class IHWBC(object):
 
         if self._trq_limit is None:
             if contact_list is not None:
-                ineq_mat = np.concatenate((np.zeros(
+                ineq_mat = torch.cat((torch.zeros(
                     (dim_cone_constraint, self._n_q_dot)), -uf_mat),
-                                          axis=1)
+                                          dim=1)
                 ineq_vec = -uf_vec
             else:
                 ineq_mat = None
@@ -264,56 +309,56 @@ class IHWBC(object):
 
         else:
             if contact_list is not None:
-                ineq_mat = np.concatenate(
-                    (np.concatenate(
-                        (np.zeros((dim_cone_constraint, self._n_q_dot)),
-                         -np.dot(sa_ni_trc_bar_tr,
-                                 np.dot(self._snf, self._mass_matrix)),
-                         np.dot(sa_ni_trc_bar_tr,
-                                np.dot(self._snf, self._mass_matrix))),
-                        axis=0),
-                     np.concatenate(
+                ineq_mat = torch.cat(
+                    (torch.cat(
+                        (torch.zeros((dim_cone_constraint, self._n_q_dot)),
+                         -torch.matmul(sa_ni_trc_bar_tr,
+                                 torch.matmul(self._snf, self._mass_matrix)),
+                         torch.matmul(sa_ni_trc_bar_tr,
+                                torch.matmul(self._snf, self._mass_matrix))),
+                        dim=0),
+                     torch.cat(
                          (-uf_mat,
-                          np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
-                                 np.dot(contact_jacobian, ni).transpose()),
-                          -np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
-                                  np.dot(contact_jacobian, ni).transpose())),
-                         axis=0)),
-                    axis=1)
-                ineq_vec = np.concatenate(
+                          torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                                 torch.matmul(contact_jacobian, ni).t()),
+                          -torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                                  torch.matmul(contact_jacobian, ni).t())),
+                         dim=0)),
+                    dim=1)
+                ineq_vec = torch.cat(
                     (-uf_vec,
-                     np.dot(
-                         np.dot(sa_ni_trc_bar_tr, self._snf),
-                         np.dot(ni.transpose(),
+                     torch.matmul(
+                         torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                         torch.matmul(ni.t(),
                                 (self._coriolis + self._gravity))) +
-                     np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                     torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                             jit_lmd_jidot_qdot) - self._trq_limit[:, 0],
-                     -np.dot(
-                         np.dot(sa_ni_trc_bar_tr, self._snf),
-                         np.dot(ni.transpose(),
+                     -torch.matmul(
+                         torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                         torch.matmul(ni.t(),
                                 (self._coriolis + self._gravity))) -
-                     np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                     torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                             jit_lmd_jidot_qdot) + self._trq_limit[:, 1]))
 
             else:
-                ineq_mat = np.concatenate(
-                    (-np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                ineq_mat = torch.cat(
+                    (-torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                              self._mass_matrix),
-                     np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                     torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                             self._mass_matrix)),
-                    axis=0)
-                ineq_vec = np.concatenate(
-                    (np.dot(
-                        np.dot(sa_ni_trc_bar_tr, self._snf),
-                        np.dot(ni.transpose(),
+                    dim=0)
+                ineq_vec = torch.cat(
+                    (torch.matmul(
+                        torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                        torch.matmul(ni.t(),
                                (self._coriolis + self._gravity))) +
-                     np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                     torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                             jit_lmd_jidot_qdot) - self._trq_limit[:, 0],
-                     -np.dot(
-                         np.dot(sa_ni_trc_bar_tr, self._snf),
-                         np.dot(ni.transpose(),
+                     -torch.matmul(
+                         torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                         torch.matmul(ni.t(),
                                 (self._coriolis + self._gravity))) -
-                     np.dot(np.dot(sa_ni_trc_bar_tr, self._snf),
+                     torch.matmul(torch.matmul(sa_ni_trc_bar_tr, self._snf),
                             jit_lmd_jidot_qdot) + self._trq_limit[:, 1]))
 
         # if verbose:
@@ -326,7 +371,8 @@ class IHWBC(object):
         # print(ineq_mat)
         # print("ineq_vec")
         # print(ineq_vec)
-
+        """CARLOS """
+        #MUST CHANGE THE SOLVER
         sol = solve_qp(cost_mat,
                        cost_vec,
                        ineq_mat,
@@ -342,18 +388,18 @@ class IHWBC(object):
             sol_q_ddot, sol_rf = sol, None
 
         if contact_list is not None:
-            joint_trq_cmd = np.dot(
-                np.dot(sa_ni_trc_bar_tr, self._snf),
-                np.dot(self._mass_matrix, sol_q_ddot) +
-                np.dot(ni.transpose(), (self._coriolis + self._gravity)) -
-                np.dot(np.dot(contact_jacobian, ni).transpose(), sol_rf))
+            joint_trq_cmd = torch.matmul(
+                torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                torch.matmul(self._mass_matrix, sol_q_ddot) +
+                torch.matmul(ni.t(), (self._coriolis + self._gravity)) -
+                torch.matmul(torch.matmul(contact_jacobian, ni).t(), sol_rf))
         else:
-            joint_trq_cmd = np.dot(
-                np.dot(sa_ni_trc_bar_tr, self._snf),
-                np.dot(self._mass_matrix, sol_q_ddot) +
-                np.dot(ni, (self._coriolis + self._gravity)))
+            joint_trq_cmd = torch.matmul(
+                torch.matmul(sa_ni_trc_bar_tr, self._snf),
+                torch.matmul(self._mass_matrix, sol_q_ddot) +
+                torch.matmul(ni, (self._coriolis + self._gravity)))
 
-        joint_acc_cmd = np.dot(self._sa, sol_q_ddot)
+        joint_acc_cmd = torch.matmul(self._sa, sol_q_ddot)
 
         if verbose:
             # if True:
@@ -369,7 +415,7 @@ class IHWBC(object):
                 print(task.target_id, " task")
                 print("des x ddot: ", x_ddot)
                 print("j*qddot_sol + Jdot*qdot: ",
-                      np.dot(j, sol_q_ddot) + j_dot_q_dot)
+                      torch.matmul(j, sol_q_ddot) + j_dot_q_dot)
 
         if self._b_data_save:
             self._data_saver.add('joint_trq_cmd', joint_trq_cmd)

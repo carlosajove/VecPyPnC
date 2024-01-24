@@ -1,5 +1,5 @@
 import abc
-import numpy as np
+import torch 
 
 
 class Contact(abc.ABC):
@@ -12,8 +12,8 @@ class Contact(abc.ABC):
     def __init__(self, robot, dim):
         self._robot = robot
         self._dim_contact = dim
-        self._jacobian = np.zeros((self._dim_contact, self._robot.n_q))
-        self._jacobian_dot_q_dot = np.zeros(self._dim_contact)
+        self._jacobian = torch.zeros((self._dim_contact, self._robot.n_q))
+        self._jacobian_dot_q_dot = torch.zeros(self._dim_contact)
         self._rf_z_max = 0.
         self._cone_constraint_mat = None
         self._cone_constraint_vec = None
