@@ -1,30 +1,47 @@
 DONE:
--contact
--basic_contact
--task
--basic_task
--internal_constraints
 -util:
     -prevent_quat_jump_pytorch
     -quat_to_exp_pytorch
+- check abc library for compatibility
+- check pickle library and os
+------------------------------------
+- batched contact 
+- batched basic_contact 
+- batched task 
+- batched basic_task <-- needs revision TODO
+- batched internal_constraints 
+- batched Draco3RollingJointConstraint in draco3_pnc
+
 
 
 TODO:
-- check abc library for compatibility
-- check pickle library and os
+-batched basic_task: do "LINK ORI" --> need orbit; R.from_quat; R.from_matrix
+- when done check represenatation of quaternions(last value scalar) to update_desired in task
+-test
 - check data saver: add function
-- change robot source code: example:
-            - get link jacobian
-            - get_link_jacobian_dot_times_qdot
-            - get link iso
 - Scipy functions: 
     - scipy.spatial.transform.Rotation  (class)  -> basic_task
             - from_quat
             - from_matrix
 
-        
 
+
+
+
+
+No need to translate right now:
+    - change robot source code: example:
+            - get link jacobian   #must be batched
+            - get_link_jacobian_dot_times_qdot #must be batched
+            - get link iso   #must be batched
+            - joint_positions #must be batched
+            - joint_velocities #must be batched
+        - robot: -n_floatnig must be constant int not batched
+                 - n_a not batched
+
+
+        
 QUESTIONS:
--check abc library for compatibility
--use of clone vs deepcopy. Right know using torch.clone
--also different of np.copy()
+- One contact (task/tci_container) class for each sim so variables and operation inside are batched
+- Or each sim has it's own contact class etc so not batched
+- rf_des; we put it as n_batch. Problem it could not exist -->should set to 0 always

@@ -110,10 +110,10 @@ def weighted_pinv(A, W, rcond=1e-15):
                np.linalg.pinv(np.dot(np.dot(A, W), A.transpose()), rcond)))
 
 def weighted_pinv_pytorch(A, W, rtol=1e-15):
-    return torch.matmul(
+    return torch.bmm(
         W,
-        torch.matmul(A.t(),
-               torch.linalg.pinv(torch.matmul(torch.matmul(A, W), A.t()), rtol=rtol)))
+        torch.bmm(A.transpose(1,2),
+               torch.linalg.pinv(torch.bmm(torch.bmm(A, W), A.transpose(1,2)), rtol=rtol)))
 
 def get_sinusoid_trajectory(start_time, mid_point, amp, freq, eval_time):
     dim = amp.shape[0]

@@ -1,5 +1,7 @@
 DONE:
-- robot_system
+Pinocchio_robot_system
+    - erase joint_pos_cmd and joint_vel_cmd from create_cmd_ordered_dict
+        - only torque command is enough in sim
 
 
 TODO:

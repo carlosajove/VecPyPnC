@@ -111,16 +111,11 @@ class PinocchioRobotSystem(RobotSystem):
             return self._model.joints[self._model.getJointId(
                 joint_id)].idx_v - self._n_floating
 
-    def create_cmd_ordered_dict(self, joint_pos_cmd, joint_vel_cmd,
-                                joint_trq_cmd):
+    def create_cmd_ordered_dict(self, joint_trq_cmd):
         command = OrderedDict()
-        command["joint_pos"] = OrderedDict()
-        command["joint_vel"] = OrderedDict()
         command["joint_trq"] = OrderedDict()
 
         for k, v in self._joint_id.items():
-            command["joint_pos"][k] = joint_pos_cmd[v]
-            command["joint_vel"][k] = joint_vel_cmd[v]
             command["joint_trq"][k] = joint_trq_cmd[v]
 
         return command

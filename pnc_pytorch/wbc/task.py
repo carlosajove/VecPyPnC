@@ -9,24 +9,25 @@ class Task(abc.ABC):
     Usage:
         update_desired --> update_jacobian --> update_cmd
     """
-    def __init__(self, robot, dim):
+    def __init__(self, robot, dim, n_batch):
         self._robot = robot
         self._dim = dim
+        self.n_batch = n_batch
 
         self._w_hierarchy = 1.0
 
-        self._kp = torch.zeros(self._dim)
-        self._kd = torch.zeros(self._dim)
+        self._kp = torch.zeros(self._dim)  #kp and kd will be the same fro all robots
+        self._kd = torch.zeros(self._dim)  #since they don't change during sim, can change this eventually
 
-        self._jacobian = torch.zeros((self._dim, self._robot.n_q_dot))
-        self._jacobian_dot_q_dot = torch.zeros(self._dim)
+        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim)
 
-        self._op_cmd = torch.zeros(self._dim)
-        self._pos_err = torch.zeros(self._dim)
+        self._op_cmd = torch.zeros(self.n_batch, self._dim)
+        self._pos_err = torch.zeros(self.n_batch, self._dim)
 
-        self._pos_des = torch.zeros(self._dim)
-        self._vel_des = torch.zeros(self._dim)
-        self._acc_des = torch.zeros(self._dim)
+        self._pos_des = torch.zeros(self.n_batch, self._dim)
+        self._vel_des = torch.zeros(self.n_batch, self._dim)
+        self._acc_des = torch.zeros(self.n_batch, self._dim)
 
     @property
     def op_cmd(self):
@@ -89,16 +90,16 @@ class Task(abc.ABC):
 
         Parameters
         ----------
-        pos_des (np.array):
-            For orientation task, the size of numpy array is 4, and it should
+        pos_des (torch.tensor([nbatch, size])):
+            For orientation task, the size of torch tensor (2nd variable) is 4, and it should
             be represented in scalar-last quaternion
-        vel_des (np.array):
+        vel_des (torch.tensor([nbatch, size])):
             Velocity desired
-        acc_des (np.array):
+        acc_des (torch.tensor([nbatch, size])):
             Acceleration desired
         """
-        assert vel_des.shape[0] == self._dim
-        assert acc_des.shape[0] == self._dim
+        assert vel_des.shape[1] == self._dim
+        assert acc_des.shape[1] == self._dim
         self._pos_des = pos_des
         self._vel_des = vel_des
         self._acc_des = acc_des

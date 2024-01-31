@@ -1,17 +1,21 @@
 DONE:
 - changed numpy to pytorch, assuming function inputs are torch
 - created funciton in utils
+- create equivalent to scipy.linalg.block_diagram, using pytorch
+        - revised 
+- implement torch compatible solver 
+- Implement dimensions as [n_batch, etc]
+- joint integrator not needed in simulation, so no q and qdot
 
 TODO:
-- create equivalent to scipy.linalg.block_diagram, using pytorch
 - check data_saver function (self.data_saver.add())
-- implement torch compatible solver 
+- testing 
 
 QUESTIONS:
-- feedback .detach(). when using torch.clone(). Using detach doesn't propagate the gradients to the clone input
-  I understand this doesn't have any effect since we are not performing any backward pass
-  Since we are not trying to do any optimization on the WBC
-- What are we doing about prints and data saves
+- related to internal_constraint code status:
+    - internal_constraint_list (list n_batch x list of InternalConstraint):
+    - internal_constraint_list(lits of batched InternalConstraints) <---- I'm going with this approach
 
-- actually the data structure doesn't matter. What matters is that the operations performed are supported in gpu
-  pytorch performes the operations in gpu. Is data stored on the gpu?
+- Seung Hyeon:
+    - Why uses ni in equality constraints
+    - differences between paper model and code model

@@ -3,9 +3,7 @@ DONE:
 -erased towr+
 
 TODO:
-- for the mpc pytorch, we can not bound the x, that means we must bound the dynamics
-  possible solution: - compute dynamics and if bigger than x_max then equal to x_max
-                     - problem: the optimization problem the optimizer understands that for those u's we have x limited but real x could be infinity
+- for the mpc pytorch, we can not bound the x (we could maybe bound the dynamics) --> problem maybe understands unfeasable dyns
+
 
 QUESTIONS:
-- operations on numbers run on CPU, how do we make them run on CPU
