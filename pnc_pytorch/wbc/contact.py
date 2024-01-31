@@ -9,12 +9,13 @@ class Contact(abc.ABC):
     Usage:
         update_contact
     """
-    def __init__(self, robot, dim):
+    def __init__(self, robot, dim, n_batch):
         self._robot = robot
         self._dim_contact = dim
-        self._jacobian = torch.zeros((self._dim_contact, self._robot.n_q))
-        self._jacobian_dot_q_dot = torch.zeros(self._dim_contact)
-        self._rf_z_max = 0.
+        self.n_batch = n_batch
+        self._jacobian = torch.zeros(self.n_batch, self._dim_contact, self._robot.n_q)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim_contact)
+        self._rf_z_max = torch.zeros(self.n_batch)
         self._cone_constraint_mat = None
         self._cone_constraint_vec = None
 
@@ -35,9 +36,10 @@ class Contact(abc.ABC):
         return self._rf_z_max
 
     @rf_z_max.setter
-    def rf_z_max(self, value):
+    def rf_z_max(self, batched_value):
         if value <= 0.:
             value = 1e-3
+        batched_value = torch.where(batched_value <= 0., 1e-3, batched_value)
         self._rf_z_max = value
 
     @property

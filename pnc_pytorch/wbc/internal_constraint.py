@@ -8,11 +8,12 @@ class InternalConstraint(abc.ABC):
     Usage:
         update_internal_constraint
     """
-    def __init__(self, robot, dim):
+    def __init__(self, robot, dim, n_batch):
         self._robot = robot
         self._dim = dim
-        self._jacobian = torch.zeros((self._dim, self._robot.n_q_dot))
-        self._jacobian_dot_q_dot = torch.zeros(self._dim)
+        self.n_batch = n_batch
+        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim)
 
     @property
     def jacobian(self):
