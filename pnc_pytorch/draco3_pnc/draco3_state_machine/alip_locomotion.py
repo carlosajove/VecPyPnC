@@ -89,8 +89,8 @@ class AlipLocomotion(StateMachine):
 
     def switchLeg(self):
         indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)
-        rfoot_z = self._robot.get_link_iso("r_foot_contact")[2, 3]
-        lfoot_z = self._robot.get_link_iso("l_foot_contact")[2, 3]
+        rfoot_z = self._robot.get_link_iso("r_foot_contact")[:, 2, 3]
+        lfoot_z = self._robot.get_link_iso("l_foot_contact")[:, 2, 3]
         rfoot_rf_max = self._tci_container.contact_list[0].rf_z_max
         lfoot_rf_max = self._tci_container.contact_list[1].rf_z_max
         for i in indices:

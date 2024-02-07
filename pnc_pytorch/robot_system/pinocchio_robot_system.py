@@ -1,5 +1,6 @@
 import os
 import sys
+import torch
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -9,7 +10,7 @@ from collections import OrderedDict
 import numpy as np
 import pinocchio as pin
 
-from pnc.robot_system.robot_system import RobotSystem
+from pnc_pytorch.robot_system.robot_system import RobotSystem
 from util import util
 from util import liegroup
 
@@ -22,12 +23,12 @@ class PinocchioRobotSystem(RobotSystem):
     Note that first six element of generalized velocities are represented in the
     base joint frame acting on the base joint frame.
     """
-    def __init__(self,
+    def __init__(self, batch,
                  urdf_file,
                  package_dir,
                  b_fixed_base,
                  b_print_info=False):
-        super(PinocchioRobotSystem, self).__init__(urdf_file, package_dir,
+        super(PinocchioRobotSystem, self).__init__(batch, urdf_file, package_dir,
                                                    b_fixed_base, b_print_info)
 
     def _config_robot(self, urdf_file, package_dir):
@@ -189,39 +190,39 @@ class PinocchioRobotSystem(RobotSystem):
         self._Ig[3:6, 3:6] = np.copy(self._data.Ig)[0:3, 0:3]
 
     def get_q(self):
-        return np.copy(self._q)
+        return torch.from_numpy(np.copy(self._q)).expand(self._n_batch, -1)
 
     def get_q_dot(self):
-        return np.copy(self._q_dot)
+        return torch.from_numpy(np.copy(self._q_dot)).expand(self._n_batch, -1)
 
     def get_mass_matrix(self):
-        return np.copy(pin.crba(self._model, self._data, self._q))
+        return torch.from_numpy(np.copy(pin.crba(self._model, self._data, self._q))).expand(self._n_batch, -1, -1)
 
     def get_gravity(self):
-        return np.copy(
-            pin.computeGeneralizedGravity(self._model, self._data, self._q))
+        return torch.from_numpy(np.copy(
+            pin.computeGeneralizedGravity(self._model, self._data, self._q))).expand(self._n_batch, -1)
 
-    def get_coriolis(self):
-        return np.copy(
+    def get_coriolis(self): #TODO: change when BATHCED sim
+        return torch.from_numpy(np.copy(
             pin.nonLinearEffects(self._model, self._data, self._q, self._q_dot)
-            - self.get_gravity())
+            - self.get_gravity()[0, :].numpy())).expand(self._n_batch, -1)
 
     def get_com_pos(self):
         pin.centerOfMass(self._model, self._data, self._q, self._q_dot)
-        return np.copy(self._data.com[0])
+        return torch.from_numpy(np.copy(self._data.com[0])).expand(self._n_batch, -1)
 
     def get_com_lin_vel(self):
         pin.centerOfMass(self._model, self._data, self._q, self._q_dot)
-        return np.copy(self._data.vcom[0])
+        return torch.from_numpy(np.copy(self._data.vcom[0])).expand(self._n_batch, -1)
 
     def get_com_lin_jacobian(self):
-        return np.copy(
-            pin.jacobianCenterOfMass(self._model, self._data, self._q))
+        return torch.from_numpy(np.copy(
+            pin.jacobianCenterOfMass(self._model, self._data, self._q))).expand(self._n_batch, -1, -1)
 
     def get_com_lin_jacobian_dot(self):
-        return np.copy((pin.computeCentroidalMapTimeVariation(
+        return torch.from_numpy(np.copy((pin.computeCentroidalMapTimeVariation(
             self._model, self._data, self._q, self._q_dot)[0:3, :]) /
-                       self._total_mass)
+                       self._total_mass)).expand(self._n_batch, -1, -1)
 
     def get_link_iso(self, link_id):
         ret = np.eye(4)
@@ -229,7 +230,7 @@ class PinocchioRobotSystem(RobotSystem):
         trans = pin.updateFramePlacement(self._model, self._data, frame_id)
         ret[0:3, 0:3] = trans.rotation
         ret[0:3, 3] = trans.translation
-        return np.copy(ret)
+        return torch.from_numpy(np.copy(ret)).expand(self._n_batch, -1, -1)
 
     def get_link_vel(self, link_id):
         ret = np.zeros(6)
@@ -242,7 +243,7 @@ class PinocchioRobotSystem(RobotSystem):
         ret[0:3] = spatial_vel.angular
         ret[3:6] = spatial_vel.linear
 
-        return np.copy(ret)
+        return torch.from_numpy(np.copy(ret)).expand(self._n_batch, -1)
 
     def get_link_jacobian(self, link_id):
         frame_id = self._model.getFrameId(link_id)
@@ -255,7 +256,7 @@ class PinocchioRobotSystem(RobotSystem):
         ret[0:3] = jac[3:6]
         ret[3:6] = jac[0:3]
 
-        return np.copy(ret)
+        return torch.from_numpy(np.copy(ret)).expand(self._n_batch, -1, -1)
 
     def get_link_jacobian_dot_times_qdot(self, link_id):
         frame_id = self._model.getFrameId(link_id)
@@ -270,4 +271,4 @@ class PinocchioRobotSystem(RobotSystem):
         ret[0:3] = jdot_qdot.angular
         ret[3:6] = jdot_qdot.linear
 
-        return np.copy(ret)
+        return torch.from_numpy(np.copy(ret)).expand(self._n_batch, -1)

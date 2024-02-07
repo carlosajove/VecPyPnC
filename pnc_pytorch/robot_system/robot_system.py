@@ -8,11 +8,12 @@ from util import util as util
 
 
 class RobotSystem(abc.ABC):
-    def __init__(self,
+    def __init__(self, batch,
                  urdf_file,
                  package_name,
                  b_fixed_base,
                  b_print_robot_info=False):
+        self._n_batch = batch
         """
         Base RobotSystem Class
 
@@ -91,7 +92,7 @@ class RobotSystem(abc.ABC):
 
     @property
     def joint_trq_limit(self):
-        return self._joint_trq_limit
+        return torch.from_numpy(self._joint_trq_limit).expand(self._n_batch, -1, -1)
 
     @property
     def joint_id(self):
@@ -115,11 +116,11 @@ class RobotSystem(abc.ABC):
 
     @property
     def joint_positions(self):
-        return self._joint_positions
+        return torch.from_numpy(self._joint_positions).expand(self._n_batch, -1)
 
     @property
     def joint_velocities(self):
-        return self._joint_velocities
+        return torch.from_numpy(self._joint_velocities).expand(self._n_batch, -1)
 
     @abc.abstractmethod
     def _update_centroidal_quantities(self):

@@ -84,7 +84,7 @@ class ALIPtrajectoryManager(object):
     """
 
     def initializeOri(self):
-        """ TODO: change when robot changed
+        """ TODO: change when robot changed and have orbit functions
         des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
 
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
@@ -93,19 +93,19 @@ class ALIPtrajectoryManager(object):
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
 
         self.des_ori_torso = util.rot_to_quat_pytorch(self._des_torso_rot)
-        self.des_ori_lfoot = self.des_ori_lfoot.clone().detach()
-        self.des_ori_rfoot = self.des_ori_lfoot.clone().detach()
+        self.des_ori_lfoot = self.des_ori_torso.clone().detach()
+        self.des_ori_rfoot = self.des_ori_torso.clone().detach()
 
         """
-        des_torso_rot = self._robot.get_link_iso(self.torso_id)[0:3, 0:3]
-        des_torso_rot = torch.from_numpy(des_torso_rot).expand(self.n_batch, -1, -1)
+        des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
         #maybe add make horizontal
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
 
         self.des_lfoot_iso = self._des_torso_rot.clone().detach()
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
 
-        des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy()
+
+        des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy() #change when orbit rot
 
         des_ori_torso = util.rot_to_quat(des_torso_rot)
         self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self.n_batch, -1)
@@ -117,7 +117,7 @@ class ALIPtrajectoryManager(object):
 
 
     def setNewOri(self): #performs rotation of com_yaw angle along z axis
-        """ TODO: change when new robot
+        """ TODO: change when new robot and orbit
         des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
         self._des_torso_rot = util.rotationZ(self.des_com_yaw, self._des_torso_rot)
@@ -126,19 +126,19 @@ class ALIPtrajectoryManager(object):
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
         #TODO: check if we need to normalize quats
         self.des_ori_torso = util.rot_to_quat_pytorch(self._des_torso_rot)
-        self.des_ori_lfoot = self.des_ori_lfoot.clone().detach()
-        self.des_ori_rfoot = self.des_ori_lfoot.clone().detach()        
+        self.des_ori_lfoot = self.des_ori_torso.clone().detach()
+        self.des_ori_rfoot = self.des_ori_torso.clone().detach()        
         """
 
-        des_torso_rot = self._robot.get_link_iso(self.torso_id)[0:3, 0:3]
-        des_torso_rot = torch.from_numpy(des_torso_rot).expand(self.n_batch, -1, -1)
+        des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
+
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
         self._des_torso_rot = util.rotationZ(self.des_com_yaw, self._des_torso_rot)
 
         self.des_lfoot_iso = self._des_torso_rot.clone().detach()
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
 
-        des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy()
+        des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy() #change when orbit rot
         des_ori_torso = util.rot_to_quat(des_torso_rot)    
 
         self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self.n_batch, -1)
@@ -163,11 +163,7 @@ class ALIPtrajectoryManager(object):
         else:
             curr_swfoot_iso = self._robot.get_link_iso(self._rfoot_task.target_id)
 
-        """TODO: change robot
-        """
-        curr_swfoot_iso_h= torch.from_numpy(curr_swfoot_iso).expand(self.n_batch, -1, -1)
-
-        curr_swfoot_pos = curr_swfoot_iso_h[:, 0:3, 3]
+        curr_swfoot_pos = curr_swfoot_iso[:, 0:3, 3]
 
         #self.AlipSwing2_curve = interpolation.AlipSwing2(self.Swingfoot_start, self.Swingfoot_end, self.swing_height, self.tr_)
         self.AlipSwing2_curve = interpolation.AlipSwing2(curr_swfoot_pos, self.Swingfoot_end, self.swing_height, self.tr_)
@@ -220,10 +216,8 @@ class ALIPtrajectoryManager(object):
                                        torch.zeros(self.n_batch,1))
         """
         #TODO: change when robot
-        com_pos = self._robot.get_com_pos()
-        com_vel = self._robot.get_com_lin_vel()
-        com_pos = torch.from_numpy(com_pos).unsqueeze(0).repeat(self.n_batch, 1)
-        com_vel = torch.from_numpy(com_vel).unsqueeze(0).repeat(self.n_batch, 1)
+        com_pos = self._robot.get_com_pos().clone()
+        com_vel = self._robot.get_com_lin_vel().clone()
 
         com_pos[:, 2] = self.refzH*torch.ones(self.n_batch, dtype=torch.float32)
         com_vel[:, 2] = torch.zeros(self.n_batch)
@@ -235,10 +229,7 @@ class ALIPtrajectoryManager(object):
 
 
     def updateCurrentPos(self, task):
-        """ Change to when new robot
         des_iso = self._robot.get_link_iso(task.target_id)
-        """
-        des_iso = torch.from_numpy(self._robot.get_link_iso(task.target_id)).expand(self.n_batch, -1, -1)
         des_pos = des_iso[:, 0:3, 3]
         task.update_desired(des_pos,
                             torch.zeros(self.n_batch, 3),
