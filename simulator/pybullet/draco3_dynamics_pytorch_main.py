@@ -16,7 +16,7 @@ import numpy as np
 np.set_printoptions(precision=2)
 
 from config.draco3_config import SimConfig
-from pnc.draco3_pnc.draco3_interface import Draco3Interface
+from pnc_pytorch.draco3_pnc.draco3_interface import Draco3Interface
 from util import pybullet_util
 from util import util
 from util import liegroup

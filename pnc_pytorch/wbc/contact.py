@@ -37,10 +37,8 @@ class Contact(abc.ABC):
 
     @rf_z_max.setter
     def rf_z_max(self, batched_value):
-        if value <= 0.:
-            value = 1e-3
         batched_value = torch.where(batched_value <= 0., 1e-3, batched_value)
-        self._rf_z_max = value
+        self._rf_z_max = batched_value
 
     @property
     def cone_constraint_mat(self):

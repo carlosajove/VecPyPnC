@@ -24,35 +24,41 @@ class PointContact(Contact):
     def _update_jacobian(self):  
         #jacobian: troch.tensor([n_batch, dimx, dimy])
         #jacobian_dot_q_dot: torch.tensor([n_batch, dimx, dimy])
+        """
         self._jacobian = self._robot.get_link_jacobian(
             self._link_id)[:, self._dim_contact:, :]  #first dim is batch
         self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
             self._link_id)[:, self._dim_contact:]
+        """
+        j = self._robot.get_link_jacobian(self._link_id)[self._dim_contact:, :]
+        jdqd = self._robot.get_link_jacobian_dot_times_qdot(self._link_id)[self._dim_contact:]
+
+        self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
+        self._jacobian_dot_q_dot = torch.from_numpy(jdqd).expand(self.n_batch, -1)
 
     def _update_cone_constraint(self): #link iso musst be batch
                                        #rf_z_max must be batch
                                        #taking the same mu, without batch, in future can implement different mu
-        rot = self._robot.get_link_iso(self._link_id)[:, 0:3, 0:3].transpose(1,2)
-        self._cone_constraint_mat = torch.zeros((6, self._dim_contact))
-        self._cone_constraint_mat[0, 2] = 1.
+        self._cone_constraint_mat = torch.zeros(self.n_batch, 6, self._dim_contact)
+        self._cone_constraint_mat[:, 0, 2] = 1.
 
-        self._cone_constraint_mat[1, 0] = 1.
-        self._cone_constraint_mat[1, 2] = self._mu
-        self._cone_constraint_mat[2, 0] = -1.
-        self._cone_constraint_mat[2, 2] = self._mu
+        self._cone_constraint_mat[:, 1, 0] = 1.
+        self._cone_constraint_mat[:, 1, 2] = self._mu
+        self._cone_constraint_mat[:, 2, 0] = -1.
+        self._cone_constraint_mat[:, 2, 2] = self._mu
 
-        self._cone_constraint_mat[3, 1] = 1.
-        self._cone_constraint_mat[3, 2] = self._mu
-        self._cone_constraint_mat[4, 1] = -1.
-        self._cone_constraint_mat[4, 2] = self._mu
+        self._cone_constraint_mat[:, 3, 1] = 1.
+        self._cone_constraint_mat[:, 3, 2] = self._mu
+        self._cone_constraint_mat[:, 4, 1] = -1.
+        self._cone_constraint_mat[:, 4, 2] = self._mu
 
-        self._cone_constraint_mat[5, 2] = -1.
+        self._cone_constraint_mat[:, 5, 2] = -1.
 
-        self._cone_contraint_mat = self._cone_constraint_mat.unsqueeze(0).repeat(self.n_batch, 1,1)
+        #self._cone_contraint_mat = self._cone_constraint_mat.unsqueeze(0).repeat(self.n_batch, 1,1)
 
 
-        self._cone_constraint_vec = torch.zeros(6)
-        self._cone_constraint_vec[5] = -self._rf_z_max
+        self._cone_constraint_vec = torch.zeros(self.n_batch, 6)
+        self._cone_constraint_vec[:, 5] = -self._rf_z_max
 
         if self._b_data_save:
             self._data_saver.add("rf_z_max_" + self._link_id, self._rf_z_max)
@@ -72,15 +78,24 @@ class SurfaceContact(Contact):
             self._data_saver = DataSaver()
 
     def _update_jacobian(self):
+        """
         self._jacobian = self._robot.get_link_jacobian(self._link_id)
         self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
             self._link_id)
+        """
+        #TODO: ERASE WHEN ROBOT CHANGED
+        j = self._robot.get_link_jacobian(self._link_id)
+        jdqd = self._robot.get_link_jacobian_dot_times_qdot(self._link_id)    
+        self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
+        self._jacobian_dot_q_dot = torch.from_numpy(jdqd).expand(self.n_batch, -1)
 
     def _update_cone_constraint(self):
         self._cone_constraint_mat = torch.zeros(self.n_batch, 16 + 2, self._dim_contact)
 
         u = self._get_u(self._x, self._y, self._mu)
-        rot = self._robot.get_link_iso(self._link_id)[:, 0:3, 0:3]
+        #TODO: ERASE when robot
+        #rot = self._robot.get_link_iso(self._link_id)[:, 0:3, 0:3]
+        rot = torch.from_numpy(self._robot.get_link_iso(self._link_id)).expand(self.n_batch, -1, -1)[:, 0:3, 0:3]
         rot_foot = torch.zeros(self.n_batch, 6, 6)
         rot_foot[:, 0:3, 0:3] = rot.transpose(1,2)
         rot_foot[:, 3:6, 3:6] = rot.transpose(1,2)
@@ -177,6 +192,6 @@ class SurfaceContact(Contact):
 
         u[17, 5] = -1.
 
-        u = u.unsqueeze(0).repeat(self.n_batch, 1 , 1)
+        u = u.expand(self.n_batch, -1 , -1)
 
         return u

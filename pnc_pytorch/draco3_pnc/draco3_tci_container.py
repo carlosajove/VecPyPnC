@@ -1,31 +1,31 @@
-import numpy as np
-
-from config.draco3_config import WBCConfig, PnCConfig
-from pnc.draco3_pnc.draco3_rolling_joint_constraint import Draco3RollingJointConstraint
-from pnc.wbc.tci_container import TCIContainer
-from pnc.wbc.basic_task import BasicTask
-from pnc.wbc.basic_contact import SurfaceContact
+import torch
+from config.draco3_alip_config import WBCConfig, PnCConfig
+from pnc_pytorch.draco3_pnc.draco3_rolling_joint_constraint import Draco3RollingJointConstraint
+from pnc_pytorch.wbc.tci_container import TCIContainer
+from pnc_pytorch.wbc.basic_task import BasicTask
+from pnc_pytorch.wbc.basic_contact import SurfaceContact
 
 
 class Draco3TCIContainer(TCIContainer):
-    def __init__(self, robot):
+    def __init__(self, robot, n_batch):
         super(Draco3TCIContainer, self).__init__(robot)
 
+        self.n_batch = n_batch
         # ======================================================================
         # Initialize Task
         # ======================================================================
         # COM Task
-        self._com_task = BasicTask(robot, "COM", 3, 'com', PnCConfig.SAVE_DATA)
-        self._com_task.kp = WBCConfig.KP_COM
-        self._com_task.kd = WBCConfig.KD_COM
-        self._com_task.w_hierarchy = WBCConfig.W_COM
+        self._com_task = BasicTask(robot, "COM", 3, self.n_batch, 'com', PnCConfig.SAVE_DATA)
+        self._com_task.kp = WBCConfig.KP_COM 
+        self._com_task.kd = WBCConfig.KD_COM 
+        self._com_task.w_hierarchy = WBCConfig.W_COM * torch.ones(self.n_batch)
 
         # Torso orientation task
-        self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3,
+        self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
                                          "torso_com_link", PnCConfig.SAVE_DATA)
-        self._torso_ori_task.kp = WBCConfig.KP_TORSO
-        self._torso_ori_task.kd = WBCConfig.KD_TORSO
-        self._torso_ori_task.w_hierarchy = WBCConfig.W_TORSO
+        self._torso_ori_task.kp = WBCConfig.KP_TORSO 
+        self._torso_ori_task.kd = WBCConfig.KD_TORSO 
+        self._torso_ori_task.w_hierarchy = WBCConfig.W_TORSO * torch.ones(self.n_batch)
 
         # Upperbody joints
         upperbody_joint = [
@@ -35,39 +35,39 @@ class Draco3TCIContainer(TCIContainer):
             'r_wrist_pitch'
         ]
         self._upper_body_task = BasicTask(robot, "SELECTED_JOINT",
-                                          len(upperbody_joint),
+                                          len(upperbody_joint), self.n_batch,
                                           upperbody_joint, PnCConfig.SAVE_DATA)
-        self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY
-        self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY
-        self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY
+        self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY 
+        self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY 
+        self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY * torch.ones(self.n_batch)
 
         # Rfoot Pos Task
-        self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
+        self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, self.n_batch,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._rfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
-        self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+        self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Lfoot Pos Task
-        self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
+        self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, self.n_batch,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
         self._lfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._lfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
-        self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+        self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Rfoot Ori Task
-        self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
+        self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._rfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
-        self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+        self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Lfoot Ori Task
-        self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
+        self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
         self._lfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._lfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
-        self._lfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
+        self._lfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         self._task_list = [
             self._com_task, self._torso_ori_task, self._upper_body_task,
@@ -80,19 +80,22 @@ class Draco3TCIContainer(TCIContainer):
         # ======================================================================
         # Rfoot Contact
         self._rfoot_contact = SurfaceContact(robot, "r_foot_contact", 0.115,
-                                             0.065, 0.3, PnCConfig.SAVE_DATA)
-        self._rfoot_contact.rf_z_max = 1e-3  # Initial rf_z_max
+                                             0.065, 0.3, self.n_batch, PnCConfig.SAVE_DATA)
+        self._rfoot_contact.rf_z_max = 1e-3 * torch.ones(self.n_batch) # Initial rf_z_max
         # Lfoot Contact
         self._lfoot_contact = SurfaceContact(robot, "l_foot_contact", 0.115,
-                                             0.065, 0.3, PnCConfig.SAVE_DATA)
-        self._lfoot_contact.rf_z_max = 1e-3  # Initial rf_z_max
+                                             0.065, 0.3, self.n_batch, PnCConfig.SAVE_DATA)
+        self._lfoot_contact.rf_z_max = 1e-3  * torch.ones(self.n_batch) # Initial rf_z_max
 
+        #alip_locomotion requires list of size 2
+        #0 for rfoot contact
+        #1 for lfoot contact
         self._contact_list = [self._rfoot_contact, self._lfoot_contact]
 
         # ======================================================================
         # Initialize Internal Constraint
         # ======================================================================
-        self._rolling_joint_constraint = Draco3RollingJointConstraint(robot)
+        self._rolling_joint_constraint = Draco3RollingJointConstraint(robot, self.n_batch)
         self._internal_constraint_list = [self._rolling_joint_constraint]
 
     @property

@@ -14,7 +14,7 @@ class Task(abc.ABC):
         self._dim = dim
         self.n_batch = n_batch
 
-        self._w_hierarchy = 1.0
+        self._w_hierarchy = torch.ones(self.n_batch)
 
         self._kp = torch.zeros(self._dim)  #kp and kd will be the same fro all robots
         self._kd = torch.zeros(self._dim)  #since they don't change during sim, can change this eventually
@@ -80,8 +80,8 @@ class Task(abc.ABC):
         self._kd = value
 
     @w_hierarchy.setter
-    def w_hierarchy(self, value):
-        self._w_hierarchy = value
+    def w_hierarchy(self, batched_value):
+        self._w_hierarchy = batched_value
 
     def update_desired(self, pos_des, vel_des, acc_des):
         """

@@ -1,0 +1,137 @@
+
+import torch 
+from util import util
+from util import interpolation
+
+#everithing has the shape [n_batch , normal_shape]
+class ALIPtrajectoryManager(object):
+    def __init(self, _n_batch, _alipMpc, _com_z_task, _torso_ori_task, _lfoot_task, _lfoot__ori_task,
+                _rfoot_task, _rfoot_ori_task, _robot):
+        self.n_batch = _n_batch
+        self.alipMpc = _alipMpc
+        self.com_z_task = _com_z_task
+        self.torso_ori_task = _torso_ori_task
+        self.lfoot_task = _lfoot_task
+        self.lfoot_ori_task = _lfoot__ori_task
+        self.rfoot_task = _rfoot_task
+        self.rfoot_ori_task = _rfoot_ori_task
+        self.robot = _robot
+
+        assert self.rfoot_task.target_id == self.rfoot_ori_task.target_id == self.rfoot_force_task.target_id
+        assert self.lfoot_task.target_id == self.lfoot_ori_task.target_id == self.lfoot_force_task.target_id
+
+        self.AlipSwing2_curve = None
+
+        #frame of reference is intertial
+        self.Swingfoot_start
+        self.Swingfoot_end
+        self.stleg_pos
+        self.stleg_pos_torso_ori
+
+        self.des_swfoot_pos
+        self.des_sw_foot_vel
+        self.des_swfoot_acc
+
+        self.des_ori_lfoot
+        self.des_ori_rfoot
+        self.des_ori_torso
+        self.des_torso_iso
+        self.des_lfoot_iso
+        self.des_rfoot_iso
+        self.des_com_yaw   #rotation per step
+
+        #indata variables mpc frame of refrence (stance foot frame of ref)
+        self.stance_leg
+        self.Ts
+
+        #time vars
+        self.swing_start_time = 0.
+
+     #parameters:
+        self.mass =
+        self.swing_height = 
+        self.refzH = 0.7
+
+
+        #task weights
+        self.com_z_task_weight
+        self.com_xy_task_weight
+        self.torso_ori_weight
+        self.swing_foot_weight
+        self.stance_foot_weight
+        self.stance_foot_ori_weight
+        self.swing_foot_ori_weight
+    
+    
+    
+    def initializeOri():
+        a= 0
+
+    def setNewOri():
+        b= 1
+
+    
+
+    def generateSwingFtraj(self, start_time, tr_):
+        self.swing_start_time = start_time
+        if (self.stance_leg == 1): # LF is swing foor
+            curr_swfoot_iso = self.robot.get_link_iso(self.lfoot_task.target_id)
+        else:
+            curr_swfoot_iso = self.robot.get_link_iso(self.rfoot_task.target_id)
+
+        curr_swfoot_pos = curr_swfoot_iso[:, 0:3, 3]
+
+        self.AlipSwing2_curve = interpolation.AlipSwing2(self.Swingfoot_start, self.Swingfoot_end, self.swing_height, self.tr_)
+
+    def updateDesired(self, curr_time):
+        t = curr_time - self.swing_start_time
+
+        self.des_sw_foot_pos = self.AlipSwing2_curve.evaluate(t)
+        self.des_sw_foot_vel = self.AlipSwing2_curve.evaluate_first_derivative(t)
+        self.des_sw_foot_acc =self.AlipSwing2_curve.evaluate_seconda_derivative(t)
+
+        if (self.stance_leg == 1):  #update left
+            self.lfoot_task.update_desired(self.des_sw_foot_pos, self.des_sw_foot_vel, self.des_sw_foot_acc)
+            self.updateCurrentPos(self.rfoot_task)
+
+            self.lfoot_task.w_hierarchy(self.swing_foot_weight)
+            self.rfoot_task.w_hierarchy(self.stance_foot_weight)
+
+            self.lfoot_ori_task.w_hierarchy(self.swing_foot_ori_weight)
+            self.rfoot_ori_task.w_hierarchy(self.stance_foot_ori_weight)
+        else:
+            self.rfoot_task.update_desired(self.des_sw_foot_pos, self.des_sw_foot_vel, self.des_sw_foot_acc)
+            self.updateCurrentPos(self.lfoot_task)
+
+            self.rfoot_task.w_hierarchy(self.swing_foot_weight)
+            self.lfoot_task.w_hierarchy(self.stance_foot_weight)
+
+            self.rfoot_ori_task.w_hierarchy(self.swing_foot_ori_weight)
+            self.lfoot_ori_task.w_hierarchy(self.stance_foot_ori_weight)
+
+        self.com_z_task.w_hierarchy(self.com_z_task_weight)
+        self.torso_ori_task.w_hierarchy(self.torso_ori_weight)
+        
+        self.com_z_task.update_desired(self.refzH*torch.ones(self.n_batch,1),
+                                       torch.zeros(self.n_batch, 1),
+                                       torch.zeros(self.n_batch,1))
+        
+
+        self.torso_ori_task.update_desired(self.des_ori_torso, 
+                                           torch.zeros(self.n_batch, 3),
+                                           torch.zeros(self.n_batch,3))
+        self.rfoot_ori_task.update_desired(self.des_ori_rfoot, 
+                                           torch.zeros(self.n_batch, 3),
+                                           torch.zeros(self.n_batch,3))
+        self.lfoot_ori_task.update_desired(self.des_ori_lfoot, 
+                                           torch.zeros(self.n_batch, 3),
+                                           torch.zeros(self.n_batch,3))
+
+    def updateCurrentPos(self, task):
+        des_iso = self.robot.get_link_iso(task.target_id)
+        des_pos = des_iso[:, 0:3, 3]
+        task.update_desired(des_pos,
+                            torch.zeros(self.n_batch, 3),
+                            torch.zeros(self.n_batch,3))
+        
+

@@ -1,6 +1,8 @@
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import numpy as np
+import torch
+import math
 
 from util import liegroup
 
@@ -180,3 +182,110 @@ class HermiteCurveQuat(object):
         self._compute_basis(s)
 
         return self._omega_1 * self._bddot1 + self._omega_2 * self._bddot2 + self._omega_3 * self._bddot3
+
+"""TODO: maybe finish implementation
+         need to find efficient way of doing the if 
+class AlipSwing(object):
+    def __init__(self, start_pos, end_pos, mid_z_pos, duration):
+        self._start_pos = start_pos.clone().detach()
+        self._end_pos = end_pos.clone().detach()
+        self._mid_z_pos = mid_z_pos.clone().detach()
+        self._duration = duration.clone().detach()
+        self.n_batch = self._start_pos.shape[0]
+
+        self.first_z = torchHermiteCurve(self._start_pos[:, 2], torch.ones(self.n_batch), 
+                                         self._mid_z_pos, torch.zeros(self.n_batch), self._duration/2)
+        self.second_z = torchHermiteCurve(self._mid_z_pos, torch.zeros(self.n_batch), 
+                                         self._end_pos[:, 2], torch.ones(self.n_batch), self._duration/2)
+    """
+"""
+    t is a batched tensor, different t in each sim, because different contact
+    """
+"""
+    def evaluate(self, t): 
+        s = t/self._duration
+
+        x = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 0] + (1-torch.cos(math.pi*s))*self._end_pos[:, 0]);
+        y = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 1] + (1-torch.cos(math.pi*s))*self._end_pos[:, 1]);
+        
+        if (t > self._duration):
+            z = self.first_z.evaluate(t - self._duration/2)
+        else:
+
+
+        return torch.stach((x,y,z), dim = 1)
+    
+    def evaluate_first_derivative(self, t):
+"""
+
+class AlipSwing2(object): # input is batched
+    def __init__(self, start_pos, end_pos, mid_z_pos, duration):
+        self._start_pos = start_pos.clone().detach()
+        self._end_pos = end_pos.clone().detach()
+        self._mid_z_pos = mid_z_pos.clone().detach()
+        self._duration = duration.clone().detach()
+        self.n_batch = self._start_pos.shape[0]
+
+        self.z_curve = QuadraticLagrangePol(start_pos[: , 2], torch.zeros(self.n_batch), 
+                                            self._mid_z_pos , self._duration/2,
+                                            self._end_pos[:, 2], self._duration)
+    
+    def evaluate(self, t):
+        s = t/self._duration
+
+        #x = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 0] + (1-torch.cos(math.pi*s))*self._end_pos[:, 0])
+        #y = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 1] + (1-torch.cos(math.pi*s))*self._end_pos[:, 1])
+
+        x = 0.5*(self._start_pos[:, 0] + self._end_pos[:, 0] + torch.cos(math.pi*s)*(self._start_pos[:, 0] - self._end_pos[:, 0]))
+        y = 0.5*(self._start_pos[:, 1] + self._end_pos[:, 1] + torch.cos(math.pi*s)*(self._start_pos[:, 1] - self._end_pos[:, 1]))
+
+        z = self.z_curve.evaluate(t)
+
+        return torch.stack((x,y,z), dim = 1)
+    
+    def evaluate_first_derivative(self, t):
+        s = t/self._duration
+        x = 0.5*math.pi*torch.cos(math.pi*s)/self._duration*(self._end_pos[:, 0] - self._start_pos[:, 0])
+        y = 0.5*math.pi*torch.cos(math.pi*s)/self._duration*(self._end_pos[:, 1] - self._start_pos[:, 1])
+        z = self.z_curve.evaluate_first_derivative(t)
+
+        return torch.stack((x, y, z), dim = 1)
+    
+    def evaluate_second_derivative(self, t):
+        s = t/self._duration
+        x = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 0] - self._start_pos[:, 0])
+        y = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 1] - self._start_pos[:, 1])
+        z = self.z_curve.evaluate_second_derivative(t)
+
+        return torch.stack((x, y, z), dim = 1)
+
+
+
+
+class QuadraticLagrangePol(object): #sizes are torhc.tensor([n_batch])
+    def __init__(self, z0, t0, z1, t1, z2, t2):
+        self._z0 = z0.clone()
+        self._z1 = z1.clone()
+        self._z2 = z2.clone()
+        self._t0 = t0.clone()
+        self._t1 = t1.clone()
+        self._t2 = t2.clone()
+
+        self._c0 = self._z0/((self._t0 - self._t1)*(self._t0 - self._t2))
+        self._c1 = self._z1/((self._t1 - self._t0)*(self._t1 - self._t2))
+        self._c2 = self._z2/((self._t2 - self._t0)*(self._t2 - self._t1))
+
+    def evaluate(self, t):
+        output = (t - self._t1)*(t - self._t2)*self._c0 + \
+                 (t - self._t0)*(t - self._t2)*self._c1 + \
+                 (t - self._t0)*(t - self._t1)*self._c2
+        return output
+        
+    def evaluate_first_derivative(self, t):
+        output = self._c0*(2*t - self._t2 - self._t1) + \
+                 self._c1*(2*t - self._t0 - self._t2) + \
+                 self._c2*(2*t - self._t0 - self._t1) 
+        return output
+
+    def evaluate_second_derivative(self, t):
+        return 2*(self._c0 + self._c1 + self._c2)

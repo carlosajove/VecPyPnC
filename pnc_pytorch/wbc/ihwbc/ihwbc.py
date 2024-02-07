@@ -7,7 +7,11 @@ from scipy.linalg import block_diag
 from util import util
 from pnc.data_saver import DataSaver
 
-from qpth.qp import QPFunction
+from pnc_pytorch.wbc.ihwbc.qpth.qp import QPFunction   #for now like this for testing 
+                                                       #afterwards should put in conda 
+
+def printvar(a, b):
+    print(a, "\n", b, b.shape, "\n")
 
 class IHWBC(object):
     """
@@ -16,21 +20,22 @@ class IHWBC(object):
     Usage:
         update_setting --> solve
     """
-    def __init__(self, sf, sa, sv, n_batch, data_save=False):  #check for sf, sa, sv types must be torch tensors: shape must be shape of x = [n_batch, shape[x]]
+    def __init__(self, sf, sa, sv, n_batch, data_save=False):  
+        #for sf, sa, sv types must be batched torch tensors: 
         self.n_batch = n_batch
-        self._n_q_dot = sa.shape[1]   #Shape works equal in pytorch
-        self._n_active = sa.shape[0]
-        self._n_passive = sv.shape[0]
+        self._n_q_dot = sa.shape[2]   
+        self._n_active = sa.shape[1]
+        self._n_passive = sv.shape[1]
 
         self._sf = sf
         self._snf = torch.cat((torch.zeros(
-            self.n_batch,self._n_active + self._n_passive, 6),
+            self.n_batch, self._n_active + self._n_passive, 6),
             torch.eye(self._n_active + self._n_passive).unsqueeze(0).repeat(self.n_batch,1,1)),
                                    dim=2)
         self._sa = sa
         self._sv = sv
 
-        self._trq_limit = None       #torch.tensor([n_batch, ])
+        self._trq_limit = None       #torch.tensor([n_batch, n_active])
         self._lambda_q_ddot = 0.     #just dim 1
         self._lambda_rf = 0.    #must be dim 1
         self._w_rf = 0.         #must be dim 1
@@ -164,14 +169,12 @@ class IHWBC(object):
             sa_ni_trc_bar = torch.eye(self._n_active).unsqueeze(0).repeat(self._n_active, 1, 1)
             sa_ni_trc_bar_tr = sa_ni_trc_bar.transpose(1,2)
             b_internal_constraint = False
-
-        # print("ni")
-        # print(ni)
-        # print("jit_lmd_jidot_qdot")
-        # print(jit_lmd_jidot_qdot)
-        # print("sa_ni_trc_bar_tr")
-        # print(sa_ni_trc_bar_tr)
+        """
+        printvar("ni", ni[0])
+        printvar("jit_lmd_jidot_qdot", jit_lmd_jidot_qdot[0])
+        printvar("sa_ni_trc_bar_tr", sa_ni_trc_bar_tr[0])
         # exit()
+        """
 
         # ======================================================================
         # Cost
@@ -185,7 +188,6 @@ class IHWBC(object):
         #task.op_cmd
         #self._w_hierarchy
         #task.op_cmd
-
         for i, task in enumerate(task_list):
             j = task.jacobian
             j_dot_q_dot = task.jacobian_dot_q_dot
@@ -194,13 +196,21 @@ class IHWBC(object):
                 print("====================")
                 print(task.target_id, " task")
                 task.debug()
+            #print(i)
+            #print("w", self._w_hierarchy[0], self._w_hierarchy.shape)
+            #print("w[i]", self._w_hierarchy[:,i], self._w_hierarchy[:,i].shape)
+            #print("j", j, j.shape)
 
             cost_t_mat += self._w_hierarchy[:,i].unsqueeze(1).unsqueeze(1) * torch.bmm(j.transpose(1,2), j)
             cost_t_vec += self._w_hierarchy[:,i].unsqueeze(1) * torch.matmul(
                 (j_dot_q_dot - x_ddot).unsqueeze(1), j).squeeze()
         # cost_t_mat += self._lambda_q_ddot * np.eye(self._n_q_dot)
         #TODO: check why uses mass matrix
+        #printvar("cost_t_mat", cost_t_mat[0])
         cost_t_mat += self._lambda_q_ddot * self._mass_matrix
+
+        #printvar("cost_t_mat 2 ", cost_t_mat[0])
+        printvar("cost t vec ", cost_t_vec[0])
 
 
         #contact.cone_contraint_vec: torch.tensor([n_batch, 6])
@@ -232,10 +242,10 @@ class IHWBC(object):
             cost_rf_mat = (self._lambda_rf + self._w_rf) * torch.eye(dim_contacts)
             #doesn't need to be batched, since params don't change between sims
 
-            """ TODO: make sure that i fwe don't have desired reaction forces, just put 0 instead
+            #TODO: make sure that i fwe don't have desired reaction forces, just put 0 instead
             if rf_des is None: #TODO: Make sure 
-                rf_des = torch.zeros(dim_contacts_h)
-            """
+                rf_des = torch.zeros(self.n_batch, dim_contacts)
+            
             cost_rf_vec = -self._w_rf * torch.clone(rf_des).detach()#rf_des torch.tensor([n_batch, ...])
 
             cost_mat_list = []
@@ -251,7 +261,9 @@ class IHWBC(object):
             dim_contacts = dim_cone_constraint = 0
             cost_mat = torch.clone(cost_t_mat).detach()
             cost_vec = torch.clone(cost_t_vec).detach()
-  
+
+        #printvar("cost_t_mat 3", cost_t_mat[0])
+
         # if verbose:
         # print("==================================")
         # np.set_printoptions(precision=4)
@@ -280,24 +292,34 @@ class IHWBC(object):
         #ni
         #ji 
         #TODO: check if b_internal_constraint depends on batch, right now assume same for all
-        #TODO: check why ni 
+        #TODO: check why ni
+        print("rank ni", torch.linalg.matrix_rank(ni), ni.shape) 
         if contact_list is not None:
             eq_floating_mat = torch.cat(
                 (torch.bmm(self._sf, self._mass_matrix),
                  -torch.bmm(self._sf,torch.bmm(contact_jacobian, ni).transpose(1,2))),
-                dim=1)  # (6, nqdot+nc)
+                dim=2)  # (6, nqdot+nc)
             if b_internal_constraint:
                 eq_int_mat = torch.cat(
                     (ji, torch.zeros(self.n_batch, ji.shape[1], dim_contacts)), dim=2)  # (2, nqdot+nc)
-                eq_int_vec = torch.zeros(ji.shape[1])
+                eq_int_vec = torch.zeros(self.n_batch, ji.shape[1])
         else:
             eq_floating_mat = torch.bmm(self._sf, self._mass_matrix)
             if b_internal_constraint:
                 eq_int_mat = torch.clone(ji).detach()
-                eq_int_vec = torch.zeros(self.n_batch, ji.shape[0])
+                eq_int_vec = torch.zeros(self.n_batch, ji.shape[1])
+        #printvar("ni^T", ni.transpose(1,2))
+        #printvar("coriolis", self._coriolis)
+        #printvar("grav", self._gravity)
+        #printvar("unsqueeze", (self._coriolis + self._gravity).unsqueeze(2))
+        #print(torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2)))
         eq_floating_vec = -torch.matmul(
             self._sf, torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2))).squeeze()
 
+        #printvar("eq_floating_mat", eq_floating_mat)
+        #printvar("eq_int_mat", eq_int_mat)
+        #printvar("eq_floaating_vec", eq_floating_vec)
+        #printvar("eq_int_vec", eq_int_vec)
         if b_internal_constraint:
             eq_mat = torch.cat((eq_floating_mat, eq_int_mat), dim=1)
             eq_vec = torch.cat((eq_floating_vec, eq_int_vec), dim=1)
@@ -385,16 +407,32 @@ class IHWBC(object):
         # print(ineq_vec)
         """CARLOS """
         #MUST CHANGE THE SOLVER
-        sol = solve_qp(cost_mat,
-                       cost_vec,
-                       ineq_mat,
-                       ineq_vec,
-                       eq_mat,
-                       eq_vec,
-                       solver="quadprog",
-                       verbose=True)
+        #printvar("cost_mat", cost_mat[0,:,:])
+        #printvar("cost_vec", cost_vec[0,:])
+        #printvar("ineq_mat", ineq_mat[0,:,:])
+        #printvar("ineq_vec", ineq_vec[0,:])
+        #printvar("eq_mat", eq_mat[0,:,:])
+        #printvar("eq_vec", eq_vec[0,:])
+        self.cost_mat = cost_mat[0,:,:]
+        self.cost_vec = cost_vec[0,:]
+        self.ineq_mat = ineq_mat[0,:,:]
+        self.ineq_vec = ineq_vec[0,:]
+        self.eq_mat = eq_mat[0,:,:]
+        self.eq_vec = eq_vec[0,:]
+
+        #exit()
+        eps = 1e-3
+        #cost_mat += eps*torch.eye(cost_mat.shape[1], cost_mat.shape[2]).unsqueeze(0).repeat(self.n_batch, 1, 1)
+        #print("cost_mat", cost_mat)
+        #print("eq_mat", eq_mat[0,:,:])
+        #print("torch", torch.linalg.matrix_rank(eq_mat[0,:,:]), eq_mat[0,:,:].shape)
+        #eq_mat += eps*torch.eye(eq_mat.shape[1], eq_mat.shape[2]).unsqueeze(0).repeat(self.n_batch, 1, 1)
+
+        #TODO: if nan's on solution check cost_mat and eq_mat
         sol = QPFunction(verbose = 1)(cost_mat, cost_vec, ineq_mat, ineq_vec, eq_mat, eq_vec)
+        self.sol = sol
         #sol -> troch.tensor([n_batch, vecsize])
+        printvar("solution", sol)
 
         if contact_list is not None:
             sol_q_ddot, sol_rf = sol[:, :self._n_q_dot], sol[:, self._n_q_dot:]

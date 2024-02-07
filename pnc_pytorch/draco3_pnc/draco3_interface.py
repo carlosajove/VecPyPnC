@@ -7,19 +7,19 @@ import copy
 
 import pybullet as p
 
-from config.draco3_config import PnCConfig
-from pnc.interface import Interface
-from pnc.draco3_pnc.draco3_interrupt_logic import Draco3InterruptLogic
-from pnc.draco3_pnc.draco3_state_provider import Draco3StateProvider
-from pnc.draco3_pnc.draco3_state_estimator import Draco3StateEstimator
-from pnc.draco3_pnc.draco3_control_architecture import Draco3ControlArchitecture
+from config.draco3_alip_config import PnCConfig
+from pnc_pytorch.interface import Interface
+from pnc_pytorch.draco3_pnc.draco3_interrupt_logic import Draco3InterruptLogic
+from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
+from pnc_pytorch.draco3_pnc.draco3_state_estimator import Draco3StateEstimator
+from pnc_pytorch.draco3_pnc.draco3_control_architecture import Draco3ControlArchitecture
 from pnc.data_saver import DataSaver
 
 
 class Draco3Interface(Interface):
     def __init__(self):
         super(Draco3Interface, self).__init__()
-
+        self._n_batch = 3
         if PnCConfig.DYN_LIB == "dart":
             from pnc.robot_system.dart_robot_system import DartRobotSystem
             self._robot = DartRobotSystem(
@@ -33,9 +33,9 @@ class Draco3Interface(Interface):
         else:
             raise ValueError("wrong dynamics library")
 
-        self._sp = Draco3StateProvider(self._robot)
-        self._se = Draco3StateEstimator(self._robot)
-        self._control_architecture = Draco3ControlArchitecture(self._robot)
+        self._sp = Draco3StateProvider(self._robot, self._n_batch)
+        self._se = Draco3StateEstimator(self._robot, self._n_batch)
+        self._control_architecture = Draco3ControlArchitecture(self._robot, self._n_batch)
         self._interrupt_logic = Draco3InterruptLogic(
             self._control_architecture)
         if PnCConfig.SAVE_DATA:

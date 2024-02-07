@@ -302,3 +302,37 @@ class GridLocation(object):
         else:
             bds = self.get_boundaries(idx)
             return np.array([(bds[0] + bds[1]) / 2., (bds[2] + bds[3]) / 2.])
+
+def MakeHorizontalDirX(rot):
+    """
+    Returns a rotation matrix parallel to ground ==> z' = [0 ,0 ,1]
+    With with the same x direction.
+    That is we set z, we project x into z plane and obtain x'. Compute y' to be ortonormal
+    """
+    new_rot = rot.clone().detach()
+    new_rot[:, 0, 2] = 0.
+    new_rot[:, 1, 2] = 0.
+    new_rot[:, 2, 2] = 1.
+    new_rot[:, 2, 0] = 0.
+    new_rot[:, 2, 1] = 0.
+    new_rot[:, :, 0] = new_rot[:, : , 0] / torch.linalg.norm(new_rot[:, :, 0], dim = 1)[:, None]
+    new_rot[:, :, 1] = torch.linalg.cross(new_rot[:, :, 2], new_rot[:, :, 0])
+
+    return new_rot
+
+def rotationZ(theta, inMatrix):
+    """
+    theta input is in degrees
+    """
+    assert len(inMatrix.shape) == 3
+    theta_radians = torch.deg2rad(theta)
+    cos_theta = torch.cos(theta_radians)
+    sin_theta = torch.sin(theta_radians)
+
+    # Construct rotation matrix
+    rotation_matrix = torch.stack([cos_theta, -sin_theta, torch.zeros_like(theta),
+                                   sin_theta, cos_theta, torch.zeros_like(theta),
+                                   torch.zeros_like(theta), torch.zeros_like(theta), torch.ones_like(theta)], dim=-1).reshape(-1, 3, 3) 
+    rotation_matrix = rotation_matrix.to(inMatrix.dtype) 
+    res = torch.bmm(rotation_matrix, inMatrix)
+    return res

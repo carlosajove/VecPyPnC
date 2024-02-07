@@ -1,9 +1,17 @@
 DONE:
 -erased dcm
 -erased towr+
+- mpc done
 
 TODO:
 - for the mpc pytorch, we can not bound the x (we could maybe bound the dynamics) --> problem maybe understands unfeasable dyns
 
 
 QUESTIONS:
+
+
+-The MPC is only computed at the beginning of the step. How do i make sure since the mpc is computed for all the robots at the same time,
+  I need all the robots to land the foot at the same time. In theory this is okay, because Ts is the same. On reality will have different swing times,
+  need to stop and wait till all the robots have completed the swing? 
+
+- Or can put the MPC in N * control freq and compute as with Tr
