@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 import numpy as np
+import torch
 
 
 class MetaSingleton(type):
@@ -14,18 +15,21 @@ class MetaSingleton(type):
 
 
 class Draco3StateProvider(metaclass=MetaSingleton):
-    def __init__(self, robot):
+    def __init__(self, robot, batch):
         self._robot = robot
-        self._nominal_joint_pos = OrderedDict()
+        self.n_batch = batch
+        #TODO: check nominal joint pos ordered Dict
+        self._nominal_joint_pos = OrderedDict() 
         self._state = 0
         self._prev_state = 0
-        self._curr_time = 0.
-        self._dcm = np.zeros(3)
-        self._prev_dcm = np.zeros(3)
-        self._dcm_vel = np.zeros(3)
+        self._curr_time = 0
+        """
         self._b_rf_contact = True
         self._b_lf_contact = True
-
+        """
+        self._b_rf_contact = [True] * self.n_batch
+        self._b_lf_contact = [True] * self.n_batch
+        
     @property
     def nominal_joint_pos(self):
         return self._nominal_joint_pos

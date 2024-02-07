@@ -1,7 +1,7 @@
 import numpy as np
 
-from pnc.interrupt_logic import InterruptLogic
-from config.draco3_config import WalkingState
+from pnc_pytorch.interrupt_logic import InterruptLogic
+from config.draco3_alip_config import WalkingState
 
 
 class Draco3InterruptLogic(InterruptLogic):
@@ -83,5 +83,10 @@ class Draco3InterruptLogic(InterruptLogic):
             if self._control_architecture.state == WalkingState.BALANCE:
                 self._control_architecture.state_machine[
                     WalkingState.BALANCE].swaying_trigger = True
+
+        if self._b_interrupt_button_a:
+            print("=" * 80)
+            print("[Interrupt Logic] button {} pressed: Swaying".format(a))
+            print("=" * 80)
 
         self._reset_flags()

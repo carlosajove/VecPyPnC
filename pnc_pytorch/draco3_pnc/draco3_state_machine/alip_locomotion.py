@@ -1,0 +1,122 @@
+import torch
+
+from pnc_pytorch.state_machine import StateMachine
+from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
+"""
+Must read the wbc state
+
+1 Per step
+    Computes ALIP MPC solutions
+    Will have the RL policy in the future
+    Sends final step fos to tm 
+
+Control fREQ
+    updates
+"""
+
+
+class AlipLocomotion(StateMachine):
+    def __init__(self, batch, id, tm, alip_mpc, tci_container, robot):
+        self.n_batch = batch
+        self._robot = robot
+        self._trajectory_manager = tm
+        self._alip_mpc = alip_mpc
+        self._tci_container = tci_container
+        self._sp = Draco3StateProvider()
+
+        #params after will implement in set params
+        self._stance_leg = torch.ones(self.n_batch)
+        self._Ts = 0.25 * torch.ones(self.n_batch)
+        self._Lx_offset = torch.zeros(self.n_batch)
+        self._Ly_des = torch.zeros(self.n_batch)
+
+
+    def first_visit(self):
+        self._state_machine_start_time = self._sp.curr_time
+        self._trajectory_manager.initializeOri()
+
+
+
+    def new_step(self):
+        self._trajectory_manager.stance_leg = self._stance_leg
+        self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
+
+        self._Tr = self._Ts - self._state_machine_time
+
+        self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
+        torso_ori = self._trajectory_manager.des_torso_rot
+
+
+        self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg, self._Lx_offset, self._Ly_des, self._Tr, torso_ori)
+
+        self._trajectory_manager.generateSwingFtraj(self._state_machine_time, self._Tr, self._swfoot_end)
+
+        new_rf_z_max_rfoot = torch.zeros(self.n_batch)
+        new_rf_z_max_lfoot = torch.zeros(self.n_batch)
+        b_lf_contact_h = self._sp.b_lf_contact
+        b_rf_contact_h = self._sp.b_rf_contact
+        for i in range(self.n_batch):
+            if (self._stance_leg[i] == 1):
+                """
+                self._sp._b_lf_contact[i] = False
+                self._sp._b_rf_contact[i] = True
+                """
+                b_lf_contact_h[i] = False
+                b_rf_contact_h[i] = True
+                new_rf_z_max_rfoot[i] = 500
+                new_rf_z_max_lfoot[i] = 0
+            else:
+                """
+                self._sp._b_rf_contact[i] = False
+                self._sp._b_lf_contact[i] = True
+                """
+                b_rf_contact_h[i] = False
+                b_lf_contact_h[i] = True
+                new_rf_z_max_lfoot[i] = 500
+                new_rf_z_max_rfoot[i] = 0
+        self._sp.b_lf_contact = b_lf_contact_h
+        self._sp.b_rf_contact = b_rf_contact_h
+        #0 will be for rfoot_contact
+        #1 will be for lfoot_contact
+        self._tci_container.contact_list[0].rf_z_max = new_rf_z_max_rfoot 
+        self._tci_container.contact_list[1].rf_z_max = new_rf_z_max_lfoot
+
+
+    def one_step(self): #in the controller
+        self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
+        t = self._state_machine_time + self._Tr - self._Ts
+        self._trajectory_manager.updateDesired(t)
+
+    def switchLeg(self):
+        indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)
+        rfoot_z = self._robot.get_link_iso("r_foot_contact")[2, 3]
+        lfoot_z = self._robot.get_link_iso("l_foot_contact")[2, 3]
+        rfoot_rf_max = self._tci_container.contact_list[0].rf_z_max
+        lfoot_rf_max = self._tci_container.contact_list[1].rf_z_max
+        for i in indices:
+            if self._stance_leg[i] == 1 and rfoot_z[i] < 0.0005:
+                self._stance_leg[i] = -1
+                lfoot_rf_max[i] = 500
+                self._state_machine_start_time = self._sp.curr_time
+                print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
+                return True
+
+
+            elif self._stance_leg[i] == -1 and lfoot_z[i] < 0.0005:
+                self.stance_leg[i] = 1
+                rfoot_rf_max[i] = 500
+                self._state_machine_start_time = self._sp.curr_time
+                print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
+                return True
+
+        self._tci_container.contact_list[0].rf_z_max = rfoot_rf_max
+        self._tci_container.contact_list[1].rf_z_max = lfoot_rf_max
+        return False
+
+
+    def end_of_state(self):
+        pass
+    def get_next_state(self):
+        pass
+    def last_visit(self):
+        pass

@@ -8,6 +8,8 @@ from qpsolvers import solve_qp
 from util import util
 from pnc.data_saver import DataSaver
 
+def printvar(a, b):
+    print("np ", a, "\n", b, b.shape, "\n")
 
 class IHWBC(object):
     """
@@ -144,15 +146,12 @@ class IHWBC(object):
             sa_ni_trc_bar = np.eye(self._n_active)
             sa_ni_trc_bar_tr = sa_ni_trc_bar.transpose()
             b_internal_constraint = False
-
-        # print("ni")
-        # print(ni)
-        # print("jit_lmd_jidot_qdot")
-        # print(jit_lmd_jidot_qdot)
-        # print("sa_ni_trc_bar_tr")
-        # print(sa_ni_trc_bar_tr)
+        """
+        printvar("ni", ni)
+        printvar("jit_lmd_jidot_qdot", jit_lmd_jidot_qdot)
+        printvar("sa_ni_trc_bar_tr", sa_ni_trc_bar_tr)
         # exit()
-
+        """
         # ======================================================================
         # Cost
         # ======================================================================
@@ -172,7 +171,11 @@ class IHWBC(object):
             cost_t_vec += self._w_hierarchy[i] * np.dot(
                 (j_dot_q_dot - x_ddot).transpose(), j)
         # cost_t_mat += self._lambda_q_ddot * np.eye(self._n_q_dot)
+        #printvar("cost_t_mat", cost_t_mat)
+
         cost_t_mat += self._lambda_q_ddot * self._mass_matrix
+        #printvar("cost_t_mat 2 ", cost_t_mat)
+        #printvar("cost t vec ", cost_t_vec  )
 
         if contact_list is not None:
             uf_mat = np.array(
@@ -201,6 +204,8 @@ class IHWBC(object):
             dim_contacts = dim_cone_constraint = 0
             cost_mat = np.copy(cost_t_mat)
             cost_vec = np.copy(cost_t_vec)
+
+        #printvar("cost_t_mat 3", cost_t_mat)
 
         # if verbose:
         # print("==================================")
@@ -240,6 +245,11 @@ class IHWBC(object):
                 eq_int_vec = np.zeros(ji.shape[0])
         eq_floating_vec = -np.dot(
             self._sf, np.dot(ni.transpose(), (self._coriolis + self._gravity)))
+
+        #printvar("eq_floating_mat", eq_floating_mat)
+        #printvar("eq_int_mat", eq_int_mat)
+        #printvar("eq_floaating_vec", eq_floating_vec)
+        #printvar("eq_int_vec", eq_int_vec)
 
         if b_internal_constraint:
             eq_mat = np.concatenate((eq_floating_mat, eq_int_mat), axis=0)
@@ -326,6 +336,20 @@ class IHWBC(object):
         # print(ineq_mat)
         # print("ineq_vec")
         # print(ineq_vec)
+        #printvar("cost_mat", cost_mat)
+        #printvar("cost_vec", cost_vec)
+        #printvar("ineq_mat", ineq_mat)
+        #printvar("ineq_vec", ineq_vec)
+        #printvar("eq_mat", eq_mat)
+        #printvar("eq_vec", eq_vec)
+        self.cost_mat = cost_mat
+        self.cost_vec = cost_vec
+        self.ineq_mat = ineq_mat
+        self.ineq_vec = ineq_vec
+        self.eq_mat = eq_mat
+        self.eq_vec = eq_vec
+
+        print(np.linalg.matrix_rank(eq_mat), eq_mat.shape)
 
         sol = solve_qp(cost_mat,
                        cost_vec,
@@ -335,6 +359,8 @@ class IHWBC(object):
                        eq_vec,
                        solver="quadprog",
                        verbose=True)
+        print("np solution", sol)
+        self.sol = sol
 
         if contact_list is not None:
             sol_q_ddot, sol_rf = sol[:self._n_q_dot], sol[self._n_q_dot:]

@@ -193,6 +193,8 @@ if __name__ == "__main__":
         elif pybullet_util.is_key_triggered(keys, 'o'):
             for k, v in gripper_command.items():
                 gripper_command[k] -= 1.94 / 3.
+        elif pybullet_util.is_key_triggered(keys, 'a'):
+            interface.interrupt_logic.b_interrupt_button_a = True
 
         # Compute Command
         if SimConfig.PRINT_TIME:

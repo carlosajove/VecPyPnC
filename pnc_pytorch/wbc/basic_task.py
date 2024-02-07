@@ -1,6 +1,7 @@
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import torch
+import numpy as np
 
 from util import util
 from pnc_pytorch.wbc.task import Task
@@ -28,9 +29,15 @@ class BasicTask(Task):
                         #get_link_vel
                         #get_com_pos
         if self._task_type == "JOINT":
-            pos = self._robot.joint_positions   
+            #TODO: robot
+            pos = self._robot.joint_positions  
+            pos = torch.from_numpy(pos).expand(self.n_batch, -1)
+
             self._pos_err = self._pos_des - pos 
+
             vel_act = self._robot.joint_velocities 
+            vel_act = torch.from_numpy(vel_act).expand(self.n_batch, -1)
+
             if self._b_data_save:
                 self._data_saver.add('joint_pos_des', self._pos_des.clone().detach())
                 self._data_saver.add('joint_vel_des', self._vel_des.clone().detach())
@@ -40,9 +47,14 @@ class BasicTask(Task):
         elif self._task_type == "SELECTED_JOINT":
             pos = self._robot.joint_positions[self._robot.get_joint_idx(
                 self._target_id)]
+            pos = torch.from_numpy(pos).expand(self.n_batch, -1)
+
             self._pos_err = self._pos_des - pos
+
             vel_act = self._robot.joint_velocities[self._robot.get_joint_idx(
                 self._target_id)]
+            vel_act = torch.from_numpy(vel_act).expand(self.n_batch, -1)
+
             if self._b_data_save:
                 self._data_saver.add('selected_joint_pos_des',
                                      self._pos_des.clone().detach())
@@ -52,9 +64,20 @@ class BasicTask(Task):
                 self._data_saver.add('selected_joint_vel', vel_act.clone().detach())
                 self._data_saver.add('w_selected_joint', self._w_hierarchy.clone().detach())
         elif self._task_type == "LINK_XYZ":
+            """
             pos = self._robot.get_link_iso(self._target_id)[:, 0:3, 3]
+            """
+            pos = self._robot.get_link_iso(self._target_id)[0:3, 3]
+            pos = torch.from_numpy(pos).expand(self.n_batch, -1)
+
             self._pos_err = self._pos_des - pos
+            """
             vel_act = self._robot.get_link_vel(self._target_id)[:, 3:6]
+            """
+            vel_act = self._robot.get_link_vel(self._target_id)[3:6]
+
+            vel_act = torch.from_numpy(vel_act).expand(self.n_batch, -1)
+
             if self._b_data_save:
                 self._data_saver.add(self._target_id + '_pos_des',
                                      self._pos_des.clone())
@@ -67,22 +90,28 @@ class BasicTask(Task):
             """--------------------------
             TODO: use orbit functions instead of scipy rotations
             -----------------------------"""
-            quat_des = R.from_quat(self._pos_des)
+            pos_des_np = self._pos_des[0, :].numpy()
+            quat_des = R.from_quat(pos_des_np)
+            """
             quat_act = R.from_matrix(
                 self._robot.get_link_iso(self._target_id)[:, 0:3, 0:3])
+            """
+            quat_act = R.from_matrix(self._robot.get_link_iso(self._target_id)[0:3, 0:3])
             quat_des_temp = quat_des.as_quat()
             quat_act_temp = quat_act.as_quat()
-            quat_act_temp = util.prevent_quat_jump_pytorch(quat_des_temp,
+            quat_act_temp = util.prevent_quat_jump(quat_des_temp,
                                                    quat_act_temp)
             quat_act = R.from_quat(quat_act_temp)
-            # quat_err = (quat_des * quat_act.inv()).as_quat() # Sign flipped
-            # quat_err = (quat_des * quat_act.inv()) # Sign flipped
             quat_err = R.from_matrix(
                 np.dot(quat_des.as_matrix(),
                        quat_act.as_matrix().transpose())).as_quat()
-            self._pos_err = util.quat_to_exp_pytorch(quat_err)
-            # self._pos_err = quat_err.as_rotvec()
+            self._pos_err = util.quat_to_exp(quat_err)
+
+            self._pos_err = torch.from_numpy(self._pos_err).expand(self.n_batch, -1)
+
             vel_act = self._robot.get_link_vel(self._target_id)[0:3]
+            vel_act = torch.from_numpy(vel_act).expand(self.n_batch, -1)
+
             if self._b_data_save:
                 self._data_saver.add(self._target_id + '_quat_des',
                                      quat_des.as_quat())
@@ -98,8 +127,13 @@ class BasicTask(Task):
                                      self._pos_err)
         elif self._task_type == "COM":
             pos = self._robot.get_com_pos()  
+            pos = torch.from_numpy(pos).expand(self.n_batch, -1)
+
             self._pos_err = self._pos_des - pos
+
             vel_act = self._robot.get_com_lin_vel()
+            vel_act = torch.from_numpy(vel_act).expand(self.n_batch, -1)
+
             if self._b_data_save:
                 self._data_saver.add(self._target_id + '_pos_des',
                                      self._pos_des.clone())
@@ -112,7 +146,7 @@ class BasicTask(Task):
             raise ValueError
 
         self._op_cmd = self._acc_des + self._kp.unsqueeze(0) * self._pos_err + self._kd.unsqueeze(0) * (self._vel_des - vel_act)
-        #TODO: check result 
+
 
 
     def update_jacobian(self):
@@ -126,19 +160,37 @@ class BasicTask(Task):
                 self._jacobian[:, i, jid] = 1
             self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim)
         elif self._task_type == "LINK_XYZ":
+            """
             self._jacobian = self._robot.get_link_jacobian(
                 self._target_id)[:, 3:6, :]
             self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
                 self._target_id)[:, 3:6]
+            """
+            j = self._robot.get_link_jacobian(self._target_id)[3:6, :]
+            jqdq = self._robot.get_link_jacobian_dot_times_qdot(self._target_id)[3:6]
+            self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
+            self._jacobian_dot_q_dot = torch.from_numpy(jqdq).expand(self.n_batch, -1)
         elif self._task_type == "LINK_ORI":
+            """
             self._jacobian = self._robot.get_link_jacobian(
                 self._target_id)[:, 0:3, :]
             self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
                 self._target_id)[:, 0:3]
+            """
+            j = self._robot.get_link_jacobian(self._target_id)[0:3, :]
+            jqdq = self._robot.get_link_jacobian_dot_times_qdot(self._target_id)[0:3]
+            self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
+            self._jacobian_dot_q_dot = torch.from_numpy(jqdq).expand(self.n_batch, -1)
         elif self._task_type == "COM":
+            """
             self._jacobian = self._robot.get_com_lin_jacobian()
             self._jacobian_dot_q_dot = torch.bmm(
                 self._robot.get_com_lin_jacobian_dot(),
                 self._robot.get_q_dot())
+            """
+            self._jacobian = torch.from_numpy(self._robot.get_com_lin_jacobian()).expand(self.n_batch, -1, -1)
+            self._jacobian_dot_q_dot = torch.matmul(
+                torch.from_numpy(self._robot.get_com_lin_jacobian_dot()).expand(self.n_batch, -1, -1),
+                torch.from_numpy(self._robot.get_q_dot()).expand(self.n_batch, -1).unsqueeze(2)).squeeze()
         else:
             raise ValueError

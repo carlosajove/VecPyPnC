@@ -19,3 +19,7 @@ QUESTIONS:
 - Seung Hyeon:
     - Why uses ni in equality constraints
     - differences between paper model and code model
+
+
+
+- pytorch qp solver and mpc is less robust to input matrices. They must be full rank, with  

@@ -1,9 +1,17 @@
 DONE:
-- 
+- controller
+- "interface"
+- interrupt logic
+- rolling joint constraint
+- "state estimator"
+- tci_container
 
 
 TODO:
+- TODO in state provider
+- control arch
 
+- State provider contact, updated in state estimator
 
 
 QUESTIONS:

@@ -113,3 +113,4 @@ class WalkingState(object):
     LF_CONTACT_TRANS_END = 6
     LF_SWING = 7
     SWAYING = 10
+    ALIP = 19

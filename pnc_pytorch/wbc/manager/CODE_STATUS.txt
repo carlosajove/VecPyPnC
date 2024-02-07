@@ -2,12 +2,17 @@ DONE:
 -task_hierarchy_manager.py
 -upper_body_trajectory_manager.py
 -erased:all other trajecotry managers
+- Mytrajectory_manager.py
+
 
 TODO:
-- Mytrajectory_manager.py
-- must include the upper body trajectory manager
-
-
+- must include the upper body trajectory manager --> for  now it's included on ctrl arch
+- use batched self
+- set Params from ctrl arch
 
 
 QUESTIONS:
+
+
+
+Same problem with stance leg as in CODE_STATUS alip_mpc
