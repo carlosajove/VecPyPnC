@@ -24,17 +24,11 @@ class PointContact(Contact):
     def _update_jacobian(self):  
         #jacobian: troch.tensor([n_batch, dimx, dimy])
         #jacobian_dot_q_dot: torch.tensor([n_batch, dimx, dimy])
-        """
         self._jacobian = self._robot.get_link_jacobian(
             self._link_id)[:, self._dim_contact:, :]  #first dim is batch
         self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
             self._link_id)[:, self._dim_contact:]
-        """
-        j = self._robot.get_link_jacobian(self._link_id)[self._dim_contact:, :]
-        jdqd = self._robot.get_link_jacobian_dot_times_qdot(self._link_id)[self._dim_contact:]
-
-        self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
-        self._jacobian_dot_q_dot = torch.from_numpy(jdqd).expand(self.n_batch, -1)
+        
 
     def _update_cone_constraint(self): #link iso musst be batch
                                        #rf_z_max must be batch
@@ -78,24 +72,17 @@ class SurfaceContact(Contact):
             self._data_saver = DataSaver()
 
     def _update_jacobian(self):
-        """
         self._jacobian = self._robot.get_link_jacobian(self._link_id)
         self._jacobian_dot_q_dot = self._robot.get_link_jacobian_dot_times_qdot(
             self._link_id)
-        """
-        #TODO: ERASE WHEN ROBOT CHANGED
-        j = self._robot.get_link_jacobian(self._link_id)
-        jdqd = self._robot.get_link_jacobian_dot_times_qdot(self._link_id)    
-        self._jacobian = torch.from_numpy(j).expand(self.n_batch, -1, -1)
-        self._jacobian_dot_q_dot = torch.from_numpy(jdqd).expand(self.n_batch, -1)
+        
+        
 
     def _update_cone_constraint(self):
         self._cone_constraint_mat = torch.zeros(self.n_batch, 16 + 2, self._dim_contact)
 
         u = self._get_u(self._x, self._y, self._mu)
-        #TODO: ERASE when robot
-        #rot = self._robot.get_link_iso(self._link_id)[:, 0:3, 0:3]
-        rot = torch.from_numpy(self._robot.get_link_iso(self._link_id)).expand(self.n_batch, -1, -1)[:, 0:3, 0:3]
+        rot = self._robot.get_link_iso(self._link_id)[:, 0:3, 0:3]
         rot_foot = torch.zeros(self.n_batch, 6, 6)
         rot_foot[:, 0:3, 0:3] = rot.transpose(1,2)
         rot_foot[:, 3:6, 3:6] = rot.transpose(1,2)

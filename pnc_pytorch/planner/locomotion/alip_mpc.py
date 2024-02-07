@@ -137,18 +137,11 @@ class ALIPtorch_mpc():
         return nominal_states, nominal_actions, nominal_objs
     
     def solve_inertia_coor(self, stance_leg, Lx_offset, Ly_des, Tr, torso_ori):
-        """
-        TODO: change when new robot
         pos = self._robot.get_com_pos()
         vel = self._robot.get_com_lin_vel()
         lfoot_pos = self._robot.get_link_iso("r_foot_contact")[:, 0:3, 3]
         rfoot_pos = self._robot.get_link_iso("l_foot_contact")[:, 0:3, 3]
-        """
-        pos = torch.from_numpy(self._robot.get_com_pos()).expand(self.n_batch, -1)
-        vel = torch.from_numpy(self._robot.get_com_lin_vel()).expand(self.n_batch, -1)
-        lfoot_pos = torch.from_numpy(self._robot.get_link_iso("r_foot_contact")[0:3, 3]).expand(self.n_batch, -1)
-        rfoot_pos = torch.from_numpy(self._robot.get_link_iso("l_foot_contact")[0:3, 3]).expand(self.n_batch, -1)
-        
+
         stleg_pos = torch.zeros(self.n_batch, 3)
 
         for i in range(self.n_batch):

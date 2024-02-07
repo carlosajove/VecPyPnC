@@ -43,7 +43,7 @@ class Draco3Controller(object):
         #TODO: robot.joint_trq_limit must not be batched, might have to change is batched
         if WBCConfig.B_TRQ_LIMIT:
             self._ihwbc.trq_limit = torch.bmm(self._sa[:,:, 6:],
-                                           torch.from_numpy(self._robot.joint_trq_limit).expand(self._n_batch, -1, -1))
+                                           self._robot.joint_trq_limit)
         self._ihwbc.lambda_q_ddot = WBCConfig.LAMBDA_Q_DDOT
         self._ihwbc.lambda_rf = WBCConfig.LAMBDA_RF
 
@@ -60,11 +60,14 @@ class Draco3Controller(object):
 
         # Dynamics properties
         mass_matrix = self._robot.get_mass_matrix()
+        mass_matrix_inv = torch.linalg.inv(mass_matrix)
+
         coriolis = self._robot.get_coriolis()
         gravity = self._robot.get_gravity()
 
         """
         This will remain until robot is changed
+        """
         """
         mass_matrix = torch.from_numpy(mass_matrix)
         mass_matrix_inv = torch.linalg.inv(mass_matrix)
@@ -72,7 +75,7 @@ class Draco3Controller(object):
         mass_matrix = mass_matrix_inv.expand(self._n_batch, -1, -1)
         coriolis = torch.from_numpy(coriolis).expand(self._n_batch, -1)
         gravity = torch.from_numpy(gravity).expand(self._n_batch, -1)
-
+        """
 
 
 

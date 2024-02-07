@@ -21,13 +21,13 @@ class Draco3Interface(Interface):
         super(Draco3Interface, self).__init__()
         self._n_batch = 3
         if PnCConfig.DYN_LIB == "dart":
-            from pnc.robot_system.dart_robot_system import DartRobotSystem
+            from pnc_pytorch.robot_system.dart_robot_system import DartRobotSystem
             self._robot = DartRobotSystem(
                 "/home/junhyeok/Repository/PnC/RobotModel/draco/draco_rel_path.urdf",
                 False, False)
         elif PnCConfig.DYN_LIB == "pinocchio":
-            from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
-            self._robot = PinocchioRobotSystem(
+            from pnc_pytorch.robot_system.pinocchio_robot_system import PinocchioRobotSystem
+            self._robot = PinocchioRobotSystem(self._n_batch, 
                 cwd + "/robot_model/draco3/draco3.urdf",
                 cwd + "/robot_model/draco3", False, PnCConfig.PRINT_ROBOT_INFO)
         else:

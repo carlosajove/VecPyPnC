@@ -2,12 +2,14 @@ DONE:
 Pinocchio_robot_system
     - erase joint_pos_cmd and joint_vel_cmd from create_cmd_ordered_dict
         - only torque command is enough in sim
+        
+we have batched the getters
 
 
 TODO:
-- Uses OrderedDict from collections. Check gpu compatibility
 - Pinocchio_robot_system.py
+- change get coriolis and get gravity when we batch
+
+
 
 QUESTION:
-- List operations where are executed.
-- Are we going to use pinnochio robot system? C++ code. Python API
