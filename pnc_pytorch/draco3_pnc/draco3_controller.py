@@ -6,6 +6,8 @@ from pnc_pytorch.data_saver import DataSaver
 from config.draco3_alip_config import PnCConfig, WBCConfig
 from pnc_pytorch.wbc.ihwbc.ihwbc import IHWBC
 
+def printvar(a, b):
+    print(a, "\n", b, " shape" , b.shape, " | type", b.dtype, "\n")
 
 class Draco3Controller(object):
     def __init__(self, tci_container, robot, batch):
@@ -59,23 +61,11 @@ class Draco3Controller(object):
         """
 
         # Dynamics properties
-        mass_matrix = self._robot.get_mass_matrix()
-        mass_matrix_inv = torch.linalg.inv(mass_matrix)
+        mass_matrix = self._robot.get_mass_matrix().float()
+        mass_matrix_inv = torch.linalg.inv(mass_matrix).float()
+        coriolis = self._robot.get_coriolis().float()
+        gravity = self._robot.get_gravity().float()
 
-        coriolis = self._robot.get_coriolis()
-        gravity = self._robot.get_gravity()
-
-        """
-        This will remain until robot is changed
-        """
-        """
-        mass_matrix = torch.from_numpy(mass_matrix)
-        mass_matrix_inv = torch.linalg.inv(mass_matrix)
-        mass_matrix = mass_matrix.expand(self._n_batch, -1, -1)
-        mass_matrix = mass_matrix_inv.expand(self._n_batch, -1, -1)
-        coriolis = torch.from_numpy(coriolis).expand(self._n_batch, -1)
-        gravity = torch.from_numpy(gravity).expand(self._n_batch, -1)
-        """
 
 
 
@@ -99,8 +89,15 @@ class Draco3Controller(object):
         joint_trq_cmd, joint_acc_cmd, rf_cmd = self._ihwbc.solve(
             self._tci_container.task_list, self._tci_container.contact_list,
             self._tci_container.internal_constraint_list)
-        joint_trq_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_trq_cmd)
-        joint_acc_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_acc_cmd)
+        """
+        print("CONTROLLER")
+        printvar("sa trunc", self._sa[:, :, 6:])
+        printvar("jointtr", joint_trq_cmd)
+        """
+        joint_trq_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_trq_cmd.unsqueeze(2)).squeeze()
+        joint_acc_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_acc_cmd.unsqueeze(2)).squeeze()
+
+        """printvar("jointtr", joint_trq_cmd)"""
 
         if PnCConfig.SAVE_DATA:
             self._data_saver.add('joint_trq_cmd', joint_trq_cmd)
@@ -108,7 +105,7 @@ class Draco3Controller(object):
 
         #TODO: change when robot changed
         joint_trq_cmd = joint_trq_cmd[0].numpy()
-        command = self._robot.create_cmd_ordered_dict(joint_trq_cmd)
+        command = self._robot.create_cmd_ordered_dict(joint_trq_cmd) #TODO: addd integration step
         return command
 
 

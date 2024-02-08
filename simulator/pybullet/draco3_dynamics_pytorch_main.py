@@ -15,7 +15,7 @@ import numpy as np
 
 np.set_printoptions(precision=2)
 
-from config.draco3_config import SimConfig
+from config.draco3_alip_config import SimConfig
 from pnc_pytorch.draco3_pnc.draco3_interface import Draco3Interface
 from util import pybullet_util
 from util import util
@@ -204,19 +204,21 @@ if __name__ == "__main__":
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)
-
+        print(command)
         # Exclude Knee Distal Joints Command
+        """
         del command['joint_pos']['l_knee_fe_jd']
         del command['joint_pos']['r_knee_fe_jd']
         del command['joint_vel']['l_knee_fe_jd']
         del command['joint_vel']['r_knee_fe_jd']
+        """
         del command['joint_trq']['l_knee_fe_jd']
         del command['joint_trq']['r_knee_fe_jd']
 
         # Apply Command
         pybullet_util.set_motor_trq(robot, joint_id, command['joint_trq'])
-        pybullet_util.set_motor_pos(robot, joint_id, gripper_command)
-
+        #pybullet_util.set_motor_pos(robot, joint_id, gripper_command)
+        #TODO change 
         # Save Image
         if (SimConfig.VIDEO_RECORD) and (count % SimConfig.RECORD_FREQ == 0):
             frame = pybullet_util.get_camera_image(

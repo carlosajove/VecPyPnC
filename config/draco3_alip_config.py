@@ -3,7 +3,7 @@ import torch
 class SimConfig(object):
     CONTROLLER_DT = 0.01
     N_SUBSTEP = 10
-    CAMERA_DT = 0.05
+    CAMERA_DT = 0.001
     KP = 0.
     KD = 0.
 
@@ -12,8 +12,8 @@ class SimConfig(object):
 
     PRINT_TIME = False
     PRINT_ROBOT_INFO = True
-    VIDEO_RECORD = False
-    RECORD_FREQ = 5
+    VIDEO_RECORD = True
+    RECORD_FREQ = 1
     SIMULATE_CAMERA = False
     SAVE_CAMERA_DATA = False
 
