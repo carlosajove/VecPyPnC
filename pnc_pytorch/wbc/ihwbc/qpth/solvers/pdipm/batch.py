@@ -431,7 +431,6 @@ a non-zero diagonal.
         .repeat(nBatch, 1).type_as(Q).int()
     #CARLOS print("S_LU_pivots", S_LU_pivots)
     if neq > 0:
-        print("hola 3")
         #invQ_AT = A.transpose(1, 2).lu_solve(*Q_LU)
         invQ_AT = torch.linalg.lu_solve(*Q_LU, A.transpose(1,2))
         A_invQ_AT = torch.bmm(A, invQ_AT)

@@ -7,6 +7,9 @@ from util import util
 from pnc_pytorch.wbc.task import Task
 from pnc_pytorch.data_saver import DataSaver
 
+def printvar(a, b):
+    print(a, "\n", b, " shape" , b.shape, " | type", b.dtype, "\n")
+
 
 class BasicTask(Task):
     def __init__(self, robot, task_type, dim, n_batch, target_id=None, data_save=False):
@@ -60,6 +63,7 @@ class BasicTask(Task):
                 self._data_saver.add('selected_joint_vel', vel_act.clone().detach())
                 self._data_saver.add('w_selected_joint', self._w_hierarchy.clone().detach())
         elif self._task_type == "LINK_XYZ":
+            print("link")
             pos = self._robot.get_link_iso(self._target_id)[:, 0:3, 3]
 
             self._pos_err = self._pos_des - pos
@@ -96,7 +100,7 @@ class BasicTask(Task):
             self._pos_err = util.quat_to_exp(quat_err)
 
             #TODO: change when orbit
-            self._pos_err = torch.from_numpy(self._pos_err).expand(self.n_batch, -1)
+            self._pos_err = torch.from_numpy(self._pos_err).expand(self.n_batch, -1).float()
 
             vel_act = self._robot.get_link_vel(self._target_id)[:, 0:3]
 
@@ -130,6 +134,16 @@ class BasicTask(Task):
                 self._data_saver.add('w_' + self._target_id, self._w_hierarchy)
         else:
             raise ValueError
+
+        """
+        print("BASIC Task")
+        printvar("acc", self._acc_des)
+        printvar("kp", self._kp)
+        printvar("kd", self._kd)
+        printvar("pos err", self._pos_err)
+        printvar("vel des", self._vel_des)
+        printvar("vel_act", vel_act)
+        """
 
         self._op_cmd = self._acc_des + self._kp.unsqueeze(0) * self._pos_err + self._kd.unsqueeze(0) * (self._vel_des - vel_act)
 

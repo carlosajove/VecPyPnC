@@ -92,7 +92,7 @@ class RobotSystem(abc.ABC):
 
     @property
     def joint_trq_limit(self):
-        return torch.from_numpy(self._joint_trq_limit).expand(self._n_batch, -1, -1)
+        return torch.from_numpy(self._joint_trq_limit).expand(self._n_batch, -1, -1).float()
 
     @property
     def joint_id(self):
@@ -116,11 +116,11 @@ class RobotSystem(abc.ABC):
 
     @property
     def joint_positions(self):
-        return torch.from_numpy(self._joint_positions).expand(self._n_batch, -1)
+        return torch.from_numpy(self._joint_positions).expand(self._n_batch, -1).float()
 
     @property
     def joint_velocities(self):
-        return torch.from_numpy(self._joint_velocities).expand(self._n_batch, -1)
+        return torch.from_numpy(self._joint_velocities).expand(self._n_batch, -1).float()
 
     @abc.abstractmethod
     def _update_centroidal_quantities(self):
