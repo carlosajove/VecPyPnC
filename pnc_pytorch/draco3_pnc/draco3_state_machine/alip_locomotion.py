@@ -103,7 +103,7 @@ class AlipLocomotion(StateMachine):
 
 
             elif self._stance_leg[i] == -1 and lfoot_z[i] < 0.0005:
-                self.stance_leg[i] = 1
+                self._stance_leg[i] = 1
                 rfoot_rf_max[i] = 500
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")

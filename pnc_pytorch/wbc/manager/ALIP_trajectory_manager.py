@@ -54,7 +54,7 @@ class ALIPtrajectoryManager(object):
 
         #parameters:#set from parameters in ctrl arch
         self.swing_height = 0.05*torch.ones(self.n_batch)
-        self.refzH = 0.685
+        self.refzH = 0.66
 
 
         #task weights 
