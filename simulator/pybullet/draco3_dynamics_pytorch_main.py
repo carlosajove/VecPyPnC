@@ -204,7 +204,7 @@ if __name__ == "__main__":
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)
-        print(command)
+
         # Exclude Knee Distal Joints Command
         """
         del command['joint_pos']['l_knee_fe_jd']

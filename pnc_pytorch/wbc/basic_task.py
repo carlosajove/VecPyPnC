@@ -63,7 +63,6 @@ class BasicTask(Task):
                 self._data_saver.add('selected_joint_vel', vel_act.clone().detach())
                 self._data_saver.add('w_selected_joint', self._w_hierarchy.clone().detach())
         elif self._task_type == "LINK_XYZ":
-            print("link")
             pos = self._robot.get_link_iso(self._target_id)[:, 0:3, 3]
 
             self._pos_err = self._pos_des - pos

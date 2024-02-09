@@ -14,6 +14,25 @@ from pnc_pytorch.wbc.ihwbc.qpth.qp import QPFunction   #for now like this for te
 def printvar(a, b):
     print(a, "\n", b, " shape" , b.shape, " | type", b.dtype, "\n")
 
+def is_psd2(mat):
+    is_symmetric = (mat == mat.T).all()
+    eigenvalues_non_negative = (torch.linalg.eigvals(mat).real >= 0).all()
+    
+    if not (is_symmetric and eigenvalues_non_negative):
+        print("The matrix is not positive semidefinite.")
+        if not is_symmetric:
+            print("Reason: The matrix is not symmetric (mat != mat.T).")
+        if not eigenvalues_non_negative:
+            print("Reason: The eigenvalues of the matrix are not all non-negative.")
+            print("Eigenvalues: ", torch.linalg.eigvals(mat).real)
+            
+    return is_symmetric and eigenvalues_non_negative
+
+def ensure_psd_add_Id(matrix, epsilon):
+    m = torch.eye(matrix.shape[1], matrix.shape[2]).repeat(matrix.shape[0], 1, 1)
+    return matrix + epsilon*m
+
+
 class IHWBC(object):
     """
     Implicit Hierarchy Whole Body Control
@@ -170,6 +189,7 @@ class IHWBC(object):
             sa_ni_trc_bar = torch.eye(self._n_active).unsqueeze(0).repeat(self._n_active, 1, 1)
             sa_ni_trc_bar_tr = sa_ni_trc_bar.transpose(1,2)
             b_internal_constraint = False
+
         """
         printvar("ni", ni[0])
         printvar("jit_lmd_jidot_qdot", jit_lmd_jidot_qdot[0])
@@ -199,12 +219,15 @@ class IHWBC(object):
                 task.debug()
             """
             print("IHWBC")
+            print("jacobian rank", torch.linalg.matrix_rank(j), j.shape)
             printvar("w", self._w_hierarchy)
             printvar("jdotqdot", j_dot_q_dot)
             printvar("xddot", x_ddot)
             printvar("jacobian", j)
             """
-            cost_t_mat += self._w_hierarchy[:,i].unsqueeze(1).unsqueeze(1).to(torch.float64) * torch.bmm(j.transpose(1,2), j).to(torch.float64)
+            jTj_psd = ensure_psd_add_Id(torch.bmm(j.transpose(1,2).to(torch.float64), j.to(torch.float64)), 1e-9)
+
+            cost_t_mat += self._w_hierarchy[:,i].unsqueeze(1).unsqueeze(1).to(torch.float64) * jTj_psd.to(torch.float64)
             cost_t_vec += self._w_hierarchy[:,i].unsqueeze(1).to(torch.float64) * torch.matmul(
                 (j_dot_q_dot - x_ddot).unsqueeze(1), j).squeeze().to(torch.float64)
 
@@ -215,7 +238,6 @@ class IHWBC(object):
 
         #printvar("cost_t_mat 2 ", cost_t_mat[0])
         #printvar("cost t vec ", cost_t_vec[0])
-
 
         #contact.cone_contraint_vec: torch.tensor([n_batch, 6])
         #contact.constraint_mat: torch.tensor([n_batch, 6, dim_contact)
@@ -297,7 +319,7 @@ class IHWBC(object):
         #ji 
         #TODO: check if b_internal_constraint depends on batch, right now assume same for all
         #TODO: check why ni
-        print("rank ni", torch.linalg.matrix_rank(ni), ni.shape) 
+        #print("rank ni", torch.linalg.matrix_rank(ni), ni.shape) 
         if contact_list is not None:
             eq_floating_mat = torch.cat(
                 (torch.bmm(self._sf, self._mass_matrix),
@@ -437,25 +459,39 @@ class IHWBC(object):
         #TODO: if nan's on solution check cost_mat and eq_mat
         #sol = QPFunction(verbose = -1)(cost_mat.float(), cost_vec.float(), ineq_mat, ineq_vec, eq_mat, eq_vec)
 
+        cost_mat = cost_mat.double()
+        cost_vec = cost_vec.double()
+        ineq_mat = ineq_mat.double()
+        ineq_vec = ineq_vec.double()
+        eq_mat = eq_mat.double()
+        eq_vec = eq_vec.double()
+        """
+        print("cost psd:", is_psd2(cost_mat[0]))
         print(cost_mat[0].numpy().shape, 
               cost_vec[0].numpy().shape, 
               ineq_mat[0].numpy().shape, 
-              ineq_mat[0].numpy().shape,
+              ineq_vec[0].numpy().shape,
               eq_mat[0].numpy().shape, 
               eq_vec[0].numpy().shape)
-
+        """
+        """
         sol = solve_qp(cost_mat[0].numpy(), 
                        cost_vec[0].numpy(), 
-                       ineq_mat[0].numpy, 
+                       ineq_mat[0].numpy(), 
                        ineq_vec[0].numpy(), 
                        eq_mat[0].numpy(), 
                        eq_vec[0].numpy(),
                        solver = "quadprog", verbose = False)
+        
+        sol = torch.from_numpy(sol).expand(self.n_batch, -1).float()
+        """
 
-        sol = sol.expand(self.n_batch, -1)
+        sol = QPFunction(verbose = -1)(cost_mat, cost_vec, ineq_mat, ineq_vec, eq_mat, eq_vec).float()
+
+
         self.sol = sol
         #sol -> troch.tensor([n_batch, vecsize])
-        printvar("solution", sol)
+        #printvar("solution", sol)
 
 
         if contact_list is not None:
