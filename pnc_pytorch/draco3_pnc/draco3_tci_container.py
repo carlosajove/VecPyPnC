@@ -80,11 +80,11 @@ class Draco3TCIContainer(TCIContainer):
         # ======================================================================
         # Rfoot Contact
         self._rfoot_contact = SurfaceContact(robot, "r_foot_contact", 0.115,
-                                             0.065, 0.3, self.n_batch, PnCConfig.SAVE_DATA)
+                                             0.065, 0.3, self.n_batch, True)
         self._rfoot_contact.rf_z_max = 1e-3 * torch.ones(self.n_batch) # Initial rf_z_max
         # Lfoot Contact
         self._lfoot_contact = SurfaceContact(robot, "l_foot_contact", 0.115,
-                                             0.065, 0.3, self.n_batch, PnCConfig.SAVE_DATA)
+                                             0.065, 0.3, self.n_batch, True)
         self._lfoot_contact.rf_z_max = 1e-3  * torch.ones(self.n_batch) # Initial rf_z_max
 
         #alip_locomotion requires list of size 2

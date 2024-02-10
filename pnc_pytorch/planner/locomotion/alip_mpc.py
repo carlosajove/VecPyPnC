@@ -15,12 +15,14 @@ parent = os.path.dirname(current)
 # adding the parent directory to 
 # the sys.path.
 sys.path.append(parent)
- 
+
+
 
 from mpc import mpc
 from mpc.mpc import QuadCost, LinDx, GradMethods
 
-
+from pnc_pytorch.data_saver import DataSaver
+from config.draco3_alip_config import AlipParams
 
 import shutil
 FFMPEG_BIN = shutil.which('ffmpeg')
@@ -43,24 +45,27 @@ plt.style.use('bmh')
 #TODO: check why doesn't match Ly des with actual state
 
 class ALIPtorch_mpc():
-    def __init__(self, robot, n_batch):     
+    def __init__(self, robot, n_batch, data_save = False):     
         self.eps = 1e-4 
         self.n_state = 4
         self.n_ctrl = 2
         self.n_batch = n_batch
         self._robot = robot
+        self._b_data_save = data_save
+        if self._b_data_save:
+            self._data_saver = DataSaver()
 
         #TODO: set parameters from configuration file
-        self.Ts = 0.25*torch.ones(self.n_batch)
-        self.Tr = 0.25*torch.ones(self.n_batch)
-        self.Nt = 4
-        self.Ns = 4
-        self.stance_sign = 1
+        self.Ts = AlipParams.TS *torch.ones(self.n_batch)
+        self.Tr = AlipParams.TS *torch.ones(self.n_batch)
+        self.Nt = AlipParams.NT
+        self.Ns = AlipParams.NS
+        self.stance_sign = AlipParams.INITIAL_STANCE_LEG
         self.u_init = None
-        self.mass = 39
-        self._zH = torch.tensor(0.685)
-        self.w = torch.tensor(0.1)
-        self.g = torch.tensor(9.81)
+        self.mass = AlipParams.MASS
+        self._zH = torch.tensor(AlipParams.ZH)
+        self.w = torch.tensor(AlipParams.WIDTH)
+        self.g = torch.tensor(AlipParams.G)
 
 
 
@@ -68,8 +73,8 @@ class ALIPtorch_mpc():
         self.dt = self.Ts[0]/self.Nt
 
         #desired state
-        self.Lx_offset = torch.zeros(self.n_batch)
-        self.Ly_des = torch.zeros(self.n_batch)
+        self.Lx_offset = AlipParams.LX_OFFSET * torch.ones(self.n_batch)
+        self.Ly_des = AlipParams.LY_DES * torch.ones(self.n_batch)
 
 
 
@@ -79,11 +84,12 @@ class ALIPtorch_mpc():
 
     
         #TODO: getter function from param data
-        self.ufp_x_max = 0.6
-        self.ufp_y_max = 0.4
-        self.ufp_y_min = 0.05
+        self.ufp_x_max = AlipParams.UFP_X_MAX
+        self.ufp_y_max = AlipParams.UFP_Y_MAX
+        self.ufp_y_min = AlipParams.UFP_Y_MIN
         self.get_u_bounds()
 
+      
 
     def solve_mpc_coor(self, stance_leg, x, Lx_offset, Ly_des, Tr): #x = [x, y, Lx, Ly]
         #computes x_0 as   A(Ts)_x

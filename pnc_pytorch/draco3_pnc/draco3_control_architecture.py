@@ -1,6 +1,6 @@
 import torch 
 
-from config.draco3_alip_config import WBCConfig, WalkingState
+from config.draco3_alip_config import WBCConfig, WalkingState, PnCConfig
 from pnc_pytorch.control_architecture import ControlArchitecture
 from pnc_pytorch.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
 from pnc_pytorch.draco3_pnc.draco3_tci_container import Draco3TCIContainer
@@ -30,7 +30,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # ======================================================================
         # Initialize Planner
         # ======================================================================
-        self._alip_mpc = ALIPtorch_mpc(robot, self._n_batch)
+        self._alip_mpc = ALIPtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
 
         # ======================================================================
         # Initialize Task Manager
@@ -72,7 +72,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # ======================================================================
         
         self._state_machine[WalkingState.ALIP] = AlipLocomotion(self._n_batch, WalkingState.ALIP, self._alip_tm, 
-                                                    self._alip_mpc, self._tci_container, robot)
+                                                    self._alip_mpc, self._tci_container, robot, PnCConfig.SAVE_DATA)
         
     
 
@@ -104,7 +104,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         command = self._draco3_controller.get_command()
         self._alip_iter += 1
         if (self._state_machine[self._state].switchLeg()):
-            self._alip_iter = -3
+            self._alip_iter = 0
 
         return command
 

@@ -5,7 +5,7 @@ import torch
 np.set_printoptions(precision=2, threshold=sys.maxsize)
 from scipy.linalg import block_diag
 from util import util
-from pnc.data_saver import DataSaver
+from pnc_pytorch.data_saver import DataSaver
 from qpsolvers import solve_qp
 
 from pnc_pytorch.wbc.ihwbc.qpth.qp import QPFunction   #for now like this for testing 
