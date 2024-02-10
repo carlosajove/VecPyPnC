@@ -2,6 +2,9 @@ import torch
 from util import util
 from util import interpolation
 
+from pnc_pytorch.data_saver import DataSaver
+from config.draco3_alip_config import WBCConfig, AlipParams
+
 #everithing has the shape [n_batch , normal_shape]
 class ALIPtrajectoryManager(object):
     def __init__(self, _n_batch, com_task, torso_ori_task, lfoot_task, lfoot_ori_task,
@@ -15,7 +18,6 @@ class ALIPtrajectoryManager(object):
         self._rfoot_task = rfoot_task
         self._rfoot_ori_task = rfoot_ori_task
         self._robot = robot
-
         assert self._rfoot_task.target_id == self._rfoot_ori_task.target_id 
         assert self._lfoot_task.target_id == self._lfoot_ori_task.target_id 
         
@@ -46,15 +48,15 @@ class ALIPtrajectoryManager(object):
         self.des_com_yaw  = torch.zeros(self.n_batch) #rotation per step
 
         #indata variables mpc frame of refrence (stance foot frame of ref)
-        self._stance_leg = None
-        self.Ts = None
+        self._stance_leg = AlipParams.INITIAL_STANCE_LEG
+        self.Ts = AlipParams.TS
 
         #time vars
         self.swing_start_time = 0.
 
         #parameters:#set from parameters in ctrl arch
-        self.swing_height = 0.05*torch.ones(self.n_batch)
-        self.refzH = 0.66
+        self.swing_height = AlipParams.SWING_HEIGHT*torch.ones(self.n_batch)
+        self.refzH = AlipParams.ZH
 
 
         #task weights 
@@ -69,12 +71,12 @@ class ALIPtrajectoryManager(object):
         """
 
         #right now using config task weights
-        self._com_z_task_weight = 80*torch.ones(self.n_batch)
-        self._torso_ori_weight = 80*torch.ones(self.n_batch)
-        self._swing_foot_weight = 40*torch.ones(self.n_batch)
-        self._stance_foot_weight = 60*torch.ones(self.n_batch)
-        self._stance_foot_ori_weight = 60*torch.ones(self.n_batch)
-        self._swing_foot_ori_weight = 40*torch.ones(self.n_batch)
+        self._com_z_task_weight = WBCConfig.W_COM * torch.ones(self.n_batch)
+        self._torso_ori_weight = WBCConfig.W_COM * torch.ones(self.n_batch)
+        self._swing_foot_weight = WBCConfig.W_SWING_FOOT * torch.ones(self.n_batch)
+        self._stance_foot_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
+        self._stance_foot_ori_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
+        self._swing_foot_ori_weight = WBCConfig.W_SWING_FOOT * torch.ones(self.n_batch)
     
     """
     self._pos = np.copy(value[0:3, 3])
@@ -228,9 +230,10 @@ class ALIPtrajectoryManager(object):
 
 
 
-    def updateCurrentPos(self, task):
+    def updateCurrentPos(self, task): #stance foot pos, z = 0 hardcoded
         des_iso = self._robot.get_link_iso(task.target_id)
         des_pos = des_iso[:, 0:3, 3]
+        des_pos[:,2] = torch.zeros(self.n_batch)
         task.update_desired(des_pos,
                             torch.zeros(self.n_batch, 3),
                             torch.zeros(self.n_batch,3))
@@ -245,6 +248,5 @@ class ALIPtrajectoryManager(object):
 
     @stance_leg.setter
     def stance_leg(self, val):
-        self._stance_leg = val
-        
+        self._stance_leg = val        
 

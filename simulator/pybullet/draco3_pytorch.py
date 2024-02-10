@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
         # Apply Command
         pybullet_util.set_motor_trq(robot, joint_id, command['joint_trq'])
-        #pybullet_util.set_motor_pos(robot, joint_id, gripper_command)
+        pybullet_util.set_motor_pos(robot, joint_id, gripper_command)
         #TODO change 
         # Save Image
         if (SimConfig.VIDEO_RECORD) and (count % SimConfig.RECORD_FREQ == 0):

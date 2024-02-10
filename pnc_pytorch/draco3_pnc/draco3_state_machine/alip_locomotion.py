@@ -2,6 +2,8 @@ import torch
 
 from pnc_pytorch.state_machine import StateMachine
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
+from pnc_pytorch.data_saver import DataSaver
+from config.draco3_alip_config import AlipParams
 """
 Must read the wbc state
 
@@ -16,7 +18,7 @@ Control fREQ
 
 
 class AlipLocomotion(StateMachine):
-    def __init__(self, batch, id, tm, alip_mpc, tci_container, robot):
+    def __init__(self, batch, id, tm, alip_mpc, tci_container, robot, data_save = False):
         self.n_batch = batch
         self._robot = robot
         self._trajectory_manager = tm
@@ -25,11 +27,15 @@ class AlipLocomotion(StateMachine):
         self._sp = Draco3StateProvider()
 
         #params after will implement in set params
-        self._stance_leg = torch.ones(self.n_batch)
-        self._Ts = 0.25 * torch.ones(self.n_batch)
-        self._Lx_offset = torch.zeros(self.n_batch)
-        self._Ly_des = torch.zeros(self.n_batch)
+        self._stance_leg = AlipParams.INITIAL_STANCE_LEG * torch.ones(self.n_batch)
+        self._Ts = AlipParams.TS * torch.ones(self.n_batch)
+        self._Lx_offset = AlipParams.LX_OFFSET * torch.ones(self.n_batch)
+        self._Ly_des = AlipParams.LY_DES * torch.ones(self.n_batch)
 
+
+        self._b_data_save = data_save
+        if self._b_data_save:
+            self._data_saver = DataSaver()
 
     def first_visit(self):
         self._state_machine_start_time = self._sp.curr_time
@@ -43,7 +49,7 @@ class AlipLocomotion(StateMachine):
 
         self._Tr = self._Ts - self._state_machine_time
 
-        self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
+        #self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
         torso_ori = self._trajectory_manager.des_torso_rot
 
 
@@ -88,30 +94,39 @@ class AlipLocomotion(StateMachine):
         self._trajectory_manager.updateDesired(t)
 
     def switchLeg(self):
+        print("Switch", self._sp.curr_time, self._sp.curr_time - self._state_machine_start_time)
         indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)
         rfoot_z = self._robot.get_link_iso("r_foot_contact")[:, 2, 3]
         lfoot_z = self._robot.get_link_iso("l_foot_contact")[:, 2, 3]
         rfoot_rf_max = self._tci_container.contact_list[0].rf_z_max
         lfoot_rf_max = self._tci_container.contact_list[1].rf_z_max
+        res = False
         for i in indices:
-            if self._stance_leg[i] == 1 and rfoot_z[i] < 0.0005:
+            if self._stance_leg[i] == 1 and lfoot_z[i] < 0.0005:
                 self._stance_leg[i] = -1
                 lfoot_rf_max[i] = 500
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                return True
+                print(rfoot_z[i])
+                res = True
+                if self._b_data_save:
+                    self._data_saver.add('leg_switch_time', self._sp.curr_time)
 
 
-            elif self._stance_leg[i] == -1 and lfoot_z[i] < 0.0005:
+            elif self._stance_leg[i] == -1 and rfoot_z[i] < 0.0005:
                 self._stance_leg[i] = 1
                 rfoot_rf_max[i] = 500
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                return True
+                print(lfoot_z[i])
+                res = True
+                if self._b_data_save:
+                    print("siwifsdafa f")
+                    self._data_saver.add('leg_switch_time', self._sp.curr_time)
 
         self._tci_container.contact_list[0].rf_z_max = rfoot_rf_max
         self._tci_container.contact_list[1].rf_z_max = lfoot_rf_max
-        return False
+        return res
 
 
     def end_of_state(self):

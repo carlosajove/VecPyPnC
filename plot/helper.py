@@ -14,7 +14,7 @@ facecolors = [
 ] * 10
 
 
-def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):
+def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle, leg_switch_time = None):
     if pos_des.shape[1] == 3:
 
         fig, axes = plt.subplots(3, 2)
@@ -37,6 +37,11 @@ def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):
             axes[i, 1].grid(True)
             axes[i, 1].set_ylabel(xyz_label[i] + 'dot')
             plot_phase(axes[i, 1], time, phase)
+            if leg_switch_time is not None:
+                for t in leg_switch_time:
+                    axes[i, 1].axvline(x=t, color='k', linestyle='--')  # Add vertical line at leg_switch_time 
+                    axes[i, 0].axvline(x=t, color='k', linestyle='--')  # Add vertical line at leg_switch_time    
+   
         axes[2, 0].set_xlabel('time')
         axes[2, 1].set_xlabel('time')
         fig.suptitle(suptitle)
@@ -76,7 +81,7 @@ def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):
         axes[0].grid(True)
         axes[1].plot(time, vel_des, color='r', linestyle='dashed', linewidth=4)
         axes[1].plot(time, vel, color='b', linewidth=2)
-        plot_phase(axes[1], time, phase)
+        plot_phase(axes[1], time, phase) 
         axes[1].grid(True)
         axes[0].set_xlabel('time')
         axes[1].set_xlabel('time')
@@ -102,6 +107,7 @@ def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):
             axes[i, 1].plot(time, vel[:, i], color='b', linewidth=2)
             plot_phase(axes[i, 1], time, phase)
             axes[i, 1].grid(True)
+ 
         axes[dim - 1, 0].set_xlabel('time')
         axes[dim - 1, 1].set_xlabel('time')
         fig.suptitle(suptitle)

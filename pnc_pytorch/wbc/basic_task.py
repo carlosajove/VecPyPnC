@@ -105,11 +105,11 @@ class BasicTask(Task):
 
             if self._b_data_save:
                 self._data_saver.add(self._target_id + '_quat_des',
-                                     quat_des.as_quat())
+                                     torch.from_numpy(quat_des.as_quat()).expand(self.n_batch, -1))
                 self._data_saver.add(self._target_id + '_ang_vel_des',
                                      self._vel_des.clone())
                 self._data_saver.add(self._target_id + '_quat',
-                                     quat_act.as_quat())
+                                     torch.from_numpy(quat_act.as_quat()).expand(self.n_batch, -1))
                 self._data_saver.add(self._target_id + '_ang_vel',
                                      vel_act.clone())
                 self._data_saver.add('w_' + self._target_id + "_ori",

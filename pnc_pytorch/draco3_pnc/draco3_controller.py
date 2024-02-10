@@ -89,15 +89,10 @@ class Draco3Controller(object):
         joint_trq_cmd, joint_acc_cmd, rf_cmd = self._ihwbc.solve(
             self._tci_container.task_list, self._tci_container.contact_list,
             self._tci_container.internal_constraint_list)
-        """
-        print("CONTROLLER")
-        printvar("sa trunc", self._sa[:, :, 6:])
-        printvar("jointtr", joint_trq_cmd)
-        """
+
         joint_trq_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_trq_cmd.unsqueeze(2)).squeeze()
         joint_acc_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_acc_cmd.unsqueeze(2)).squeeze()
 
-        """printvar("jointtr", joint_trq_cmd)"""
 
         if PnCConfig.SAVE_DATA:
             self._data_saver.add('joint_trq_cmd', joint_trq_cmd)
