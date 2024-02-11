@@ -86,7 +86,10 @@ class Draco3InterruptLogic(InterruptLogic):
 
         if self._b_interrupt_button_a:
             print("=" * 80)
-            print("[Interrupt Logic] button {} pressed: Swaying".format(a))
+            print("[Interrupt Logic] button {} pressed: Swaying".format('a'))
             print("=" * 80)
+            if self._control_architecture.state == WalkingState.BALANCE:
+                self._control_architecture.state_machine[
+                    WalkingState.BALANCE].walking_trigger = True
 
         self._reset_flags()

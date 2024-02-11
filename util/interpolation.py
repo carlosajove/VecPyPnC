@@ -28,7 +28,24 @@ def smooth_changing_acc(ini, end, dur, curr_time):
         np.pi / dur) * np.cos(curr_time / dur * np.pi)
     if curr_time > dur:
         ret = 0.
+    return ret
 
+def smooth_changing_pytorch(ini, end, dur, curr_time):
+    ret = ini + (end - ini) * 0.5 * (1 - torch.cos(curr_time / dur * math.pi))
+    ret = torch.where(curr_time > dur, end, ret)
+    return ret
+
+
+def smooth_changing_vel_pytorch(ini, end, dur, curr_time):
+    ret = (end - ini) * 0.5 * (math.pi / dur) * torch.sin(curr_time / dur * math.pi)
+    ret = torch.where(curr_time > dur, end, ret)
+    return ret
+
+
+def smooth_changing_acc_pytorch(ini, end, dur, curr_time):
+    ret = (end - ini) * 0.5 * (math.pi / dur) * (
+        math.pi / dur) * torch.cos(curr_time / dur * torch.pi)
+    ret = torch.where(curr_time > dur, end, ret)
     return ret
 
 

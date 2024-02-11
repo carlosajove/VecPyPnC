@@ -228,8 +228,9 @@ class IHWBC(object):
             jTj_psd = ensure_psd_add_Id(torch.bmm(j.transpose(1,2).to(torch.float64), j.to(torch.float64)), 1e-9)
 
             cost_t_mat += self._w_hierarchy[:,i].unsqueeze(1).unsqueeze(1).to(torch.float64) * jTj_psd.to(torch.float64)
+
             cost_t_vec += self._w_hierarchy[:,i].unsqueeze(1).to(torch.float64) * torch.matmul(
-                (j_dot_q_dot - x_ddot).unsqueeze(1), j).squeeze().to(torch.float64)
+                (j_dot_q_dot.to(torch.float64) - x_ddot.to(torch.float64)).unsqueeze(1), j.to(torch.float64)).squeeze().to(torch.float64)
 
         # cost_t_mat += self._lambda_q_ddot * np.eye(self._n_q_dot)
         #TODO: check why uses mass matrix
@@ -258,7 +259,6 @@ class IHWBC(object):
                 [contact.cone_constraint_vec for contact in contact_list], axis = 1)
             contact_jacobian = torch.cat(
                 [contact.jacobian for contact in contact_list], axis=1)
-
             assert uf_mat.shape[1] == uf_vec.shape[1]
             assert uf_mat.shape[2] == contact_jacobian.shape[1]
 
@@ -367,6 +367,7 @@ class IHWBC(object):
                 ineq_vec = None
 
         else:
+            print("HELLO")
             if contact_list is not None:
                 ineq_mat = torch.cat(
                     (torch.cat(
@@ -433,7 +434,7 @@ class IHWBC(object):
         # print(ineq_vec)
         """CARLOS """
         #MUST CHANGE THE SOLVER
-        torch.set_printoptions(threshold=10000)
+        #torch.set_printoptions(threshold=10000)
         #printvar("cost_mat", cost_mat[0,:,:])
         #print(torch.linalg.matrix_rank(cost_mat[0, :, :]))
         #printvar("cost_vec", cost_vec[0,:])
@@ -467,12 +468,12 @@ class IHWBC(object):
         eq_vec = eq_vec.double()
         """
         print("cost psd:", is_psd2(cost_mat[0]))
-        print(cost_mat[0].numpy().shape, 
-              cost_vec[0].numpy().shape, 
-              ineq_mat[0].numpy().shape, 
-              ineq_vec[0].numpy().shape,
-              eq_mat[0].numpy().shape, 
-              eq_vec[0].numpy().shape)
+        print(cost_mat[0].numpy(), 
+              cost_vec[0].numpy(), 
+              ineq_mat[0].numpy(), 
+              ineq_vec[0].numpy(),
+              eq_mat[0].numpy(), 
+              eq_vec[0].numpy())
         """
         """
         sol = solve_qp(cost_mat[0].numpy(), 
@@ -485,7 +486,17 @@ class IHWBC(object):
         
         sol = torch.from_numpy(sol).expand(self.n_batch, -1).float()
         """
-
+        """
+        print("cost psd:", is_psd2(cost_mat[0]))
+        print(torch.isnan(cost_mat).any().item())  
+        print(torch.isnan(cost_vec).any().item())  
+        print(torch.isnan(eq_mat).any().item())  
+        print(torch.isnan(ineq_mat).any().item())  
+        print(torch.isnan(eq_vec).any().item())  
+        print("CHECK")
+        print(torch.isnan(ineq_vec).any().item())  
+        print(ineq_vec)
+        """
         sol = QPFunction(verbose = -1)(cost_mat, cost_vec, ineq_mat, ineq_vec, eq_mat, eq_vec).float()
 
 
@@ -535,4 +546,8 @@ class IHWBC(object):
             self._data_saver.add('joint_acc_cmd', joint_acc_cmd)
             self._data_saver.add('rf_cmd', sol_rf)
 
+        """
+        print("IHWBC")
+        print(joint_trq_cmd, joint_acc_cmd, sol_rf)
+        """
         return joint_trq_cmd, joint_acc_cmd, sol_rf

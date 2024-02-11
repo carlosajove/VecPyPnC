@@ -8,10 +8,18 @@ from pnc_pytorch.draco3_pnc.draco3_controller import Draco3Controller
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
+
+
+
+
 from pnc_pytorch.planner.locomotion.alip_mpc import ALIPtorch_mpc
 from pnc_pytorch.wbc.manager.ALIP_trajectory_manager import ALIPtrajectoryManager
-from pnc_pytorch.draco3_pnc.draco3_state_machine.alip_locomotion import AlipLocomotion
+from pnc_pytorch.wbc.manager.floating_base_trajectory_manager import FloatingBaseTrajectoryManager
 
+from pnc_pytorch.draco3_pnc.draco3_state_machine.alip_locomotion import AlipLocomotion
+from pnc_pytorch.draco3_pnc.draco3_state_machine.double_support_balance import DoubleSupportBalance
+from pnc_pytorch.draco3_pnc.draco3_state_machine.double_support_stand import DoubleSupportStand
+from pnc_pytorch.wbc.manager.reaction_force_manager import ReactionForceManager
 
 class Draco3ControlArchitecture(ControlArchitecture):
     def __init__(self, robot, batch):
@@ -41,19 +49,20 @@ class Draco3ControlArchitecture(ControlArchitecture):
                     self._tci_container.rfoot_pos_task, self._tci_container.rfoot_ori_task,
                     robot)
 
+        self._floating_base_tm = FloatingBaseTrajectoryManager(self._n_batch,
+                    self._tci_container.com_task, self._tci_container.torso_ori_task,
+                    robot)
 
         self._upper_body_tm = UpperBodyTrajectoryManager(self._n_batch,
             self._tci_container.upper_body_task, robot)
 
-        """
+        
         self._trajectory_managers = {
-            "rfoot": self._rfoot_tm,
-            "lfoot": self._lfoot_tm,
+            "alip_tm": self._alip_tm,
             "upper_body": self._upper_body_tm,
             "floating_base": self._floating_base_tm,
-            "dcm": self._dcm_tm
         }
-        """
+        
 
         # ======================================================================
         # Initialize Hierarchy Manager
@@ -64,8 +73,17 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # ======================================================================
         # Initialize Reaction Force Manager
         # ======================================================================
+        #ONLY USING IN STAND UP
+        self._rfoot_fm = ReactionForceManager(self._n_batch,
+            self._tci_container.rfoot_contact, WBCConfig.RF_Z_MAX)
 
-        # Currently not using
+        self._lfoot_fm = ReactionForceManager(self._n_batch,
+            self._tci_container.lfoot_contact, WBCConfig.RF_Z_MAX)
+
+        self._reaction_force_managers = {
+            "rfoot": self._rfoot_fm,
+            "lfoot": self._lfoot_fm
+        }
 
         # ======================================================================
         # Initialize State Machines
@@ -74,11 +92,21 @@ class Draco3ControlArchitecture(ControlArchitecture):
         self._state_machine[WalkingState.ALIP] = AlipLocomotion(self._n_batch, WalkingState.ALIP, self._alip_tm, 
                                                     self._alip_mpc, self._tci_container, robot, PnCConfig.SAVE_DATA)
         
-    
+        self._state_machine[WalkingState.STAND] = DoubleSupportStand(self._n_batch,
+            WalkingState.STAND, self._trajectory_managers, self._reaction_force_managers, robot)
+        self._state_machine[
+            WalkingState.STAND].end_time = 0.2 
+        self._state_machine[
+            WalkingState.STAND].rf_z_max_time = 0.1 * torch.ones(self._n_batch)
+        self._state_machine[
+            WalkingState.STAND].com_height_des = 0.69 * torch.ones(self._n_batch)
 
+        self._state_machine[WalkingState.BALANCE] = DoubleSupportBalance(self._n_batch,
+            WalkingState.BALANCE, self._alip_tm, robot)
+        
         # Set Starting State
-        self._state = WalkingState.ALIP
-        self._prev_state = WalkingState.ALIP
+        self._state = WalkingState.STAND
+        self._prev_state = WalkingState.STAND
         self._b_state_first_visit = True
 
         self._sp = Draco3StateProvider()
@@ -86,26 +114,39 @@ class Draco3ControlArchitecture(ControlArchitecture):
         self._alip_iter = 0
 
     def get_command(self):
-
         if self._b_state_first_visit:
             self._state_machine[self._state].first_visit()
             self._b_state_first_visit = False
+        if(self._state == WalkingState.ALIP):
+            # Update State Machine
+            if(self._alip_iter >= 0):
+                if (self._alip_iter == 0):
+                    self._state_machine[self._state].new_step()
+                self._state_machine[self._state].one_step()
 
-        # Update State Machine
-        if(self._alip_iter >= 0):
-            if (self._alip_iter == 0):
-                self._state_machine[self._state].new_step()
+            # Update State Machine Independent Trajectories
+            self._upper_body_tm.use_nominal_upper_body_joint_pos(
+                self._sp.nominal_joint_pos)
+            # Get Whole Body Control Commands
+            command = self._draco3_controller.get_command()
+            self._alip_iter += 1
+            if (self._state_machine[self._state].switchLeg()):
+                self._alip_iter = 0
+        else: 
+             # Update State Machine
             self._state_machine[self._state].one_step()
+            # Update State Machine Independent Trajectories
+            self._upper_body_tm.use_nominal_upper_body_joint_pos(
+                self._sp.nominal_joint_pos)
+            # Get Whole Body Control Commands
+            command = self._draco3_controller.get_command()
 
-        # Update State Machine Independent Trajectories
-        self._upper_body_tm.use_nominal_upper_body_joint_pos(
-            self._sp.nominal_joint_pos)
-        # Get Whole Body Control Commands
-        command = self._draco3_controller.get_command()
-        self._alip_iter += 1
-        if (self._state_machine[self._state].switchLeg()):
-            self._alip_iter = 0
-
+            if self._state_machine[self._state].end_of_state():
+                print("END", "%"*80)
+                self._state_machine[self._state].last_visit()
+                self._prev_state = self._state
+                self._state = self._state_machine[self._state].get_next_state()
+                self._b_state_first_visit = True
         return command
 
     @property
