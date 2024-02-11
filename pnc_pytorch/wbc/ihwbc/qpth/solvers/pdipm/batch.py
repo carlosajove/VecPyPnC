@@ -12,8 +12,11 @@ torch.lu_solve to torch.linalg.lu_solve
 """
 
 def lu_hack(x):
-    data, pivots = x.lu(pivot=not x.is_cuda)
-    #data, pivots = torch.linalg.lu_factor(x, pivot=not x.is_cuda)
+    #data, pivots = x.lu(pivot=not x.is_cuda)
+    #print("CALROS")
+    #print(x[0])
+    data, pivots = torch.linalg.lu_factor(x, pivot=not x.is_cuda)
+    #print(data, pivots)
     if x.is_cuda:
         if x.ndimension() == 2:
             pivots = torch.arange(1, 1+x.size(0)).int().cuda()
@@ -306,6 +309,9 @@ def factor_solve_kkt_reg(Q_tilde, D, G, A, rx, rs, rz, ry, eps):
         g_ = torch.cat([rx, rs], 1)
         h_ = rz
 
+    
+
+    print(torch.isnan(H_).any().item())  
     H_LU = lu_hack(H_)
 
     #invH_A_ = A_.transpose(1, 2).lu_solve(*H_LU)
@@ -316,6 +322,7 @@ def factor_solve_kkt_reg(Q_tilde, D, G, A, rx, rs, rz, ry, eps):
 
     S_ = torch.bmm(A_, invH_A_)
     S_ -= eps * torch.eye(neq + nineq).type_as(Q_tilde).repeat(nBatch, 1, 1)
+    print(torch.isnan(S_).any().item())  
     S_LU = lu_hack(S_)
     t_ = torch.bmm(invH_g_.unsqueeze(1), A_.transpose(1, 2)).squeeze(1) - h_
     #w_ = -t_.unsqueeze(2).lu_solve(*S_LU).squeeze(2)
@@ -347,7 +354,8 @@ def factor_solve_kkt(Q, D, G, A, rx, rs, rz, ry):
         A_ = torch.cat([G, torch.eye(nineq).type_as(Q)], 1)
         g_ = torch.cat([rx, rs], 1)
         h_ = rz
-
+    print("CARLOS 1")
+    print(torch.isnan(H_).any().item())  
     H_LU = lu_hack(H_)
 
     #invH_A_ = A_.transpose(1, 2).lu_solve(*H_LU)
@@ -355,8 +363,10 @@ def factor_solve_kkt(Q, D, G, A, rx, rs, rz, ry):
     invH_A_ = torch.linalg.lu_solve(*H_LU, A_.transpose(1,2))
     invH_g_ = torch.linalg.lu_solve(*H_LU, g_.unsqueeze(2)).squeeze(2)
 
-
+    print("CARLOS 2")
     S_ = torch.bmm(A_, invH_A_)
+    print(torch.isnan(S_).any().item())  
+
     S_LU = lu_hack(S_)
     t_ = torch.bmm(invH_g_.unsqueeze(1), A_.transpose(1, 2)).squeeze(1) - h_
     #w_ = -t_.unsqueeze(2).lu_solve(*S_LU).squeeze(2)
@@ -435,6 +445,7 @@ a non-zero diagonal.
         invQ_AT = torch.linalg.lu_solve(*Q_LU, A.transpose(1,2))
         A_invQ_AT = torch.bmm(A, invQ_AT)
         G_invQ_AT = torch.bmm(G, invQ_AT)
+ 
 
         LU_A_invQ_AT = lu_hack(A_invQ_AT)
         P_A_invQ_AT, L_A_invQ_AT, U_A_invQ_AT = torch.lu_unpack(*LU_A_invQ_AT)

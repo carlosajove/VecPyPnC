@@ -37,12 +37,12 @@ class WBCConfig(object):
     W_COM = 100.0
     W_TORSO = 80.0
     W_UPPER_BODY = 20.0
-    W_CONTACT_FOOT = 50.0
+    W_CONTACT_FOOT = 60.0
     W_SWING_FOOT = 80.0
 
     # Task Gains
-    KP_COM = torch.tensor([400., 400., 400])
-    KD_COM = torch.tensor([20., 20., 20.])
+    KP_COM = torch.tensor([1000., 1000., 1000])
+    KD_COM = torch.tensor([100., 100., 100.])
 
     KP_TORSO = torch.tensor([100., 100., 100])
     KD_TORSO = torch.tensor([10., 10., 10.])
@@ -58,7 +58,7 @@ class WBCConfig(object):
     KD_UPPER_BODY = torch.tensor(
         [2., 8., 8., 8., 3., 2., 3., 8., 8., 8., 3., 2., 3.])
 
-    KP_FOOT_POS = torch.tensor([1000., 1000., 1000.])
+    KP_FOOT_POS = torch.tensor([10000., 10000., 10000.])
     KD_FOOT_POS = torch.tensor([30., 30., 30.])
     KP_FOOT_ORI = torch.tensor([300., 300., 300.])
     KD_FOOT_ORI = torch.tensor([30., 30., 30.])
@@ -91,11 +91,11 @@ class WalkingState(object):
 
 class AlipParams(object):
     N_BATCH = 3
-    TS = 0.1
+    TS = 0.15
     NT = 4
     NS = 4
     MASS = 39
-    ZH = 0.64
+    ZH = 0.69
     WIDTH = 0.1
     G = 9.81
     UFP_X_MAX = 0.5

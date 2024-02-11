@@ -107,7 +107,6 @@ class AlipLocomotion(StateMachine):
                 lfoot_rf_max[i] = 500
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                print(rfoot_z[i])
                 res = True
                 if self._b_data_save:
                     self._data_saver.add('leg_switch_time', self._sp.curr_time)
@@ -118,10 +117,8 @@ class AlipLocomotion(StateMachine):
                 rfoot_rf_max[i] = 500
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                print(lfoot_z[i])
                 res = True
                 if self._b_data_save:
-                    print("siwifsdafa f")
                     self._data_saver.add('leg_switch_time', self._sp.curr_time)
 
         self._tci_container.contact_list[0].rf_z_max = rfoot_rf_max

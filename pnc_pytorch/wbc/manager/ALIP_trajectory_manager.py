@@ -97,7 +97,6 @@ class ALIPtrajectoryManager(object):
         self.des_ori_torso = util.rot_to_quat_pytorch(self._des_torso_rot)
         self.des_ori_lfoot = self.des_ori_torso.clone().detach()
         self.des_ori_rfoot = self.des_ori_torso.clone().detach()
-
         """
         des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
         #maybe add make horizontal
@@ -227,6 +226,9 @@ class ALIPtrajectoryManager(object):
         self._com_task.w_hierarchy = self._com_z_task_weight
         self._com_task.update_desired(com_pos, com_vel, torch.zeros(self.n_batch, 3))
 
+        
+
+
 
 
 
@@ -237,6 +239,23 @@ class ALIPtrajectoryManager(object):
         task.update_desired(des_pos,
                             torch.zeros(self.n_batch, 3),
                             torch.zeros(self.n_batch,3))
+    
+    def updateCurrentOri(self, task): #TODO: change when orbit
+        des_iso = self._robot.get_link_iso(task.target_id)
+        des_rot = des_iso[0, 0:3, 0:3].numpy()
+        des_rot = util.rot_to_quat(des_rot)
+        des_rot = torch.from_numpy(des_rot).expand(self.n_batch, -1)
+        task.update_desired(des_rot,
+                            torch.zeros(self.n_batch, 3),
+                            torch.zeros(self.n_batch, 3))
+
+
+    def use_both_current(self):
+        self.updateCurrentPos(self._lfoot_task)
+        self.updateCurrentOri(self._lfoot_ori_task)
+        self.updateCurrentPos(self._rfoot_task)
+        self.updateCurrentOri(self._rfoot_ori_task)
+       
     
     @property
     def des_torso_rot(self):
