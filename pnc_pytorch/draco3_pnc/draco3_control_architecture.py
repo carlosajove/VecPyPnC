@@ -131,7 +131,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
             command = self._draco3_controller.get_command()
             self._alip_iter += 1
             if (self._state_machine[self._state].switchLeg()):
-                self._alip_iter = 0
+                self._alip_iter = -3
         else: 
              # Update State Machine
             self._state_machine[self._state].one_step()

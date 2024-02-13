@@ -9,7 +9,7 @@ from config.draco3_alip_config import WBCConfig, AlipParams
 class ALIPtrajectoryManager(object):
     def __init__(self, _n_batch, com_task, torso_ori_task, lfoot_task, lfoot_ori_task,
                 rfoot_task, rfoot_ori_task, robot):
-        self.n_batch = _n_batch
+        self._n_batch = _n_batch
         #self.com_z_task = _com_z_task
         self._com_task = com_task
         self._torso_ori_task = torso_ori_task
@@ -28,24 +28,24 @@ class ALIPtrajectoryManager(object):
         self.AlipSwing2_curve = None
 
         #frame of reference is intertial
-        self.Swingfoot_start = torch.zeros(self.n_batch, 3)
-        self.Swingfoot_end = torch.zeros(self.n_batch, 3)
-        self.stleg_pos = torch.zeros(self.n_batch, 3)
+        self.Swingfoot_start = torch.zeros(self._n_batch, 3)
+        self.Swingfoot_end = torch.zeros(self._n_batch, 3)
+        self.stleg_pos = torch.zeros(self._n_batch, 3)
 
-        self.stleg_pos_torso_ori = torch.zeros(self.n_batch, 3)  #frame of ref is torso ori 
+        self.stleg_pos_torso_ori = torch.zeros(self._n_batch, 3)  #frame of ref is torso ori 
 
-        self.des_swfoot_pos = torch.zeros(self.n_batch, 3)
-        self.des_sw_foot_vel = torch.zeros(self.n_batch, 3)
-        self.des_swfoot_acc = torch.zeros(self.n_batch, 3)
+        self.des_swfoot_pos = torch.zeros(self._n_batch, 3)
+        self.des_sw_foot_vel = torch.zeros(self._n_batch, 3)
+        self.des_swfoot_acc = torch.zeros(self._n_batch, 3)
 
-        self.des_ori_lfoot = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self.n_batch, 1, 1)
-        self.des_ori_rfoot = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self.n_batch, 1, 1)
-        self.des_ori_torso = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self.n_batch, 1, 1)
+        self.des_ori_lfoot = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self.des_ori_rfoot = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self.des_ori_torso = torch.tensor([0, 0, 0, 1]).unsqueeze(0).repeat(self._n_batch, 1, 1)
 
-        self._des_torso_rot = torch.eye(3).unsqueeze(0).repeat(self.n_batch, 1, 1)
-        self.des_lfoot_rot = torch.eye(3).unsqueeze(0).repeat(self.n_batch, 1, 1)
-        self.des_rfoot_rot = torch.eye(3).unsqueeze(0).repeat(self.n_batch, 1, 1)
-        self.des_com_yaw  = torch.zeros(self.n_batch) #rotation per step
+        self._des_torso_rot = torch.eye(3).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self.des_lfoot_rot = torch.eye(3).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self.des_rfoot_rot = torch.eye(3).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self._des_com_yaw  = torch.zeros(self._n_batch) #rotation per step
 
         #indata variables mpc frame of refrence (stance foot frame of ref)
         self._stance_leg = AlipParams.INITIAL_STANCE_LEG
@@ -55,7 +55,7 @@ class ALIPtrajectoryManager(object):
         self.swing_start_time = 0.
 
         #parameters:#set from parameters in ctrl arch
-        self.swing_height = AlipParams.SWING_HEIGHT*torch.ones(self.n_batch)
+        self.swing_height = AlipParams.SWING_HEIGHT*torch.ones(self._n_batch)
         self.refzH = AlipParams.ZH
 
 
@@ -71,12 +71,12 @@ class ALIPtrajectoryManager(object):
         """
 
         #right now using config task weights
-        self._com_z_task_weight = WBCConfig.W_COM * torch.ones(self.n_batch)
-        self._torso_ori_weight = WBCConfig.W_COM * torch.ones(self.n_batch)
-        self._swing_foot_weight = WBCConfig.W_SWING_FOOT * torch.ones(self.n_batch)
-        self._stance_foot_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
-        self._stance_foot_ori_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
-        self._swing_foot_ori_weight = WBCConfig.W_SWING_FOOT * torch.ones(self.n_batch)
+        self._com_z_task_weight = WBCConfig.W_COM * torch.ones(self._n_batch)
+        self._torso_ori_weight = WBCConfig.W_COM * torch.ones(self._n_batch)
+        self._swing_foot_weight = WBCConfig.W_SWING_FOOT * torch.ones(self._n_batch)
+        self._stance_foot_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self._n_batch)
+        self._stance_foot_ori_weight = WBCConfig.W_CONTACT_FOOT * torch.ones(self._n_batch)
+        self._swing_foot_ori_weight = WBCConfig.W_SWING_FOOT * torch.ones(self._n_batch)
     
     """
     self._pos = np.copy(value[0:3, 3])
@@ -105,11 +105,11 @@ class ALIPtrajectoryManager(object):
         self.des_lfoot_iso = self._des_torso_rot.clone().detach()
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
 
-
+        #TODO: change when orbit
         des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy() #change when orbit rot
 
         des_ori_torso = util.rot_to_quat(des_torso_rot)
-        self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self.n_batch, -1)
+        self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self._n_batch, -1)
         self.des_ori_lfoot = self.des_ori_torso.clone().detach()
         self.des_ori_rfoot = self.des_ori_torso.clone().detach()
 
@@ -121,7 +121,7 @@ class ALIPtrajectoryManager(object):
         """ TODO: change when new robot and orbit
         des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
-        self._des_torso_rot = util.rotationZ(self.des_com_yaw, self._des_torso_rot)
+        self._des_torso_rot = util.rotationZ(self._des_com_yaw, self._des_torso_rot)
 
         self.des_lfoot_iso = self._des_torso_rot.clone().detach()
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
@@ -131,10 +131,10 @@ class ALIPtrajectoryManager(object):
         self.des_ori_rfoot = self.des_ori_torso.clone().detach()        
         """
 
-        des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
+        #des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
 
-        self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
-        self._des_torso_rot = util.rotationZ(self.des_com_yaw, self._des_torso_rot)
+        self._des_torso_rot = util.MakeHorizontalDirX(self._des_torso_rot)
+        self._des_torso_rot = util.rotationZ(self._des_com_yaw, self._des_torso_rot)
 
         self.des_lfoot_iso = self._des_torso_rot.clone().detach()
         self.des_rfoot_iso = self._des_torso_rot.clone().detach()
@@ -142,7 +142,7 @@ class ALIPtrajectoryManager(object):
         des_torso_rot = self._des_torso_rot[0, :, :].clone().detach().numpy() #change when orbit rot
         des_ori_torso = util.rot_to_quat(des_torso_rot)    
 
-        self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self.n_batch, -1)
+        self.des_ori_torso = torch.from_numpy(des_ori_torso).expand(self._n_batch, -1)
         self.des_ori_lfoot = self.des_ori_torso.clone().detach()
         self.des_ori_rfoot = self.des_ori_torso.clone().detach()   
 
@@ -201,30 +201,33 @@ class ALIPtrajectoryManager(object):
         self._torso_ori_task.w_hierarchy = self._torso_ori_weight
 
         self._torso_ori_task.update_desired(self.des_ori_torso, 
-                                           torch.zeros(self.n_batch, 3),
-                                           torch.zeros(self.n_batch,3))
+                                           torch.zeros(self._n_batch, 3),
+                                           torch.zeros(self._n_batch,3))
         self._rfoot_ori_task.update_desired(self.des_ori_rfoot, 
-                                           torch.zeros(self.n_batch, 3),
-                                           torch.zeros(self.n_batch,3))
+                                           torch.zeros(self._n_batch, 3),
+                                           torch.zeros(self._n_batch,3))
         self._lfoot_ori_task.update_desired(self.des_ori_lfoot, 
-                                           torch.zeros(self.n_batch, 3),
-                                           torch.zeros(self.n_batch,3))
+                                           torch.zeros(self._n_batch, 3),
+                                           torch.zeros(self._n_batch,3))
         """COM z is not implemented.
             Full COM task is implemented
         self._com_z_task.w_hierarchy = self.com_z_task_weight
-        self._com_z_task.update_desired(self.refzH*torch.ones(self.n_batch,1),
-                                       torch.zeros(self.n_batch, 1),
-                                       torch.zeros(self.n_batch,1))
+        self._com_z_task.update_desired(self.refzH*torch.ones(self._n_batch,1),
+                                       torch.zeros(self._n_batch, 1),
+                                       torch.zeros(self._n_batch,1))
         """
         #TODO: change when robot
         com_pos = self._robot.get_com_pos().clone()
         com_vel = self._robot.get_com_lin_vel().clone()
 
-        com_pos[:, 2] = self.refzH*torch.ones(self.n_batch, dtype=torch.float32)
-        com_vel[:, 2] = torch.zeros(self.n_batch)
+
+        #com_pos[:, 1] = torch.zeros(self._n_batch)
+        #com_vel[:, 1] = torch.zeros(self._n_batch)
+        com_pos[:, 2] = self.refzH*torch.ones(self._n_batch, dtype=torch.float32)
+        com_vel[:, 2] = torch.zeros(self._n_batch)
 
         self._com_task.w_hierarchy = self._com_z_task_weight
-        self._com_task.update_desired(com_pos, com_vel, torch.zeros(self.n_batch, 3))
+        self._com_task.update_desired(com_pos, com_vel, torch.zeros(self._n_batch, 3))
 
         
 
@@ -235,19 +238,19 @@ class ALIPtrajectoryManager(object):
     def updateCurrentPos(self, task): #stance foot pos, z = 0 hardcoded
         des_iso = self._robot.get_link_iso(task.target_id)
         des_pos = des_iso[:, 0:3, 3]
-        des_pos[:,2] = torch.zeros(self.n_batch)
+        des_pos[:,2] = torch.zeros(self._n_batch)
         task.update_desired(des_pos,
-                            torch.zeros(self.n_batch, 3),
-                            torch.zeros(self.n_batch,3))
+                            torch.zeros(self._n_batch, 3),
+                            torch.zeros(self._n_batch,3))
     
     def updateCurrentOri(self, task): #TODO: change when orbit
         des_iso = self._robot.get_link_iso(task.target_id)
         des_rot = des_iso[0, 0:3, 0:3].numpy()
         des_rot = util.rot_to_quat(des_rot)
-        des_rot = torch.from_numpy(des_rot).expand(self.n_batch, -1)
+        des_rot = torch.from_numpy(des_rot).expand(self._n_batch, -1)
         task.update_desired(des_rot,
-                            torch.zeros(self.n_batch, 3),
-                            torch.zeros(self.n_batch, 3))
+                            torch.zeros(self._n_batch, 3),
+                            torch.zeros(self._n_batch, 3))
 
 
     def use_both_current(self):
@@ -265,7 +268,15 @@ class ALIPtrajectoryManager(object):
     def stance_leg(self):
         return self._stance_leg
 
+    @property
+    def des_com_yaw(self):
+        return self._des_com_yaw
+
     @stance_leg.setter
     def stance_leg(self, val):
-        self._stance_leg = val        
+        self._stance_leg = val 
+
+    @des_com_yaw.setter 
+    def des_com_yaw(self, val):
+        self._stance_leg = val      
 

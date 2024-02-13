@@ -4,19 +4,6 @@ import sys
 import math
 import numpy as np
  
-# getting the name of the directory
-# where the this file is present.
-current = os.path.dirname(os.path.realpath(__file__))
- 
-# Getting the parent directory name
-# where the current directory is present.
-parent = os.path.dirname(current)
- 
-# adding the parent directory to 
-# the sys.path.
-sys.path.append(parent)
-
-
 
 from mpc import mpc
 from mpc.mpc import QuadCost, LinDx, GradMethods
@@ -63,9 +50,9 @@ class ALIPtorch_mpc():
         self.stance_sign = AlipParams.INITIAL_STANCE_LEG
         self.u_init = None
         self.mass = AlipParams.MASS
-        self._zH = torch.tensor(AlipParams.ZH)
-        self.w = torch.tensor(AlipParams.WIDTH)
-        self.g = torch.tensor(AlipParams.G)
+        self._zH = AlipParams.ZH
+        self.w = AlipParams.WIDTH
+        self.g = AlipParams.G
 
 
 
@@ -106,21 +93,23 @@ class ALIPtorch_mpc():
         #computes x_0 //this is wrong
         #x_ = torch.cat((self._x, torch.zeros(n_batch,1), torch.zeros(n_batch,1)), dim = 1).unsqueeze(2)
         #x_0 = torch.bmm(self.F[0,:,:,:], x_).squeeze(2)
-
         exp_Atr = torch.linalg.matrix_exp(self._A.expand(self.n_batch,-1, -1)*self.Tr.view(-1, 1, 1)) 
         x = x.to(exp_Atr.dtype)
         x_0 = torch.matmul(exp_Atr, x.unsqueeze(2)).squeeze()
-        
+        #x_0 = x
 
         #TODO: look at code status about the problem with this
         if(self.stance_sign[0] == 1): #set bounds TODO:CHECK f is the good one
             self.u_lower = self.u_lower_plus
             self.u_upper = self.u_upper_plus
             self.q = self.q_minus
+            
+            #self.q = self.q_plus
         else: #first left swing  
             self.u_lower = self.u_lower_minus
             self.u_upper = self.u_upper_minus
             self.q = self.q_plus
+            #self.q = self.q_minus
 
         #self.u_lower = None
         #self.u_upper = None
@@ -130,41 +119,64 @@ class ALIPtorch_mpc():
                 u_init= self.u_init,
                 u_lower= self.u_lower, u_upper= self.u_upper,
                 lqr_iter=50,
-                verbose=-1,
+                verbose=1,
                 exit_unconverged=False,
                 detach_unconverged=False,
                 grad_method=GradMethods.ANALYTIC,
                 eps=1e-2,
             )(x_0, QuadCost(self.Q, self.q), LinDx(self.F))
-        self.up_u_init(nominal_actions)
+        #self.up_u_init(nominal_actions)
+
+        if self._b_data_save:
+            self._data_saver.add('mpc_actions', nominal_actions)
+            self._data_saver.add('mpc_states', nominal_states)
+            self._data_saver.add('mpc_x_0', x_0)  #initial state should be nominal_states[0]
+            self._data_saver.add('mpc_Lx_offset', Lx_offset)
+            self._data_saver.add('mpc_Ly_des', Ly_des)
+            self._data_saver.add('mpc_stance_leg', stance_leg)
+            self._data_saver.add('mpc_x', self._x)
+            self._data_saver.add('mpc_Tr', Tr)
+            self._data_saver.add('mpc_u_lower', self.u_lower)
+            self._data_saver.add('mpc_u_upper', self.u_upper)
+            self._data_saver.add('mpc_Cost', self.Q)
+            self._data_saver.add('mpc_cost', self.q)
+            self._data_saver.add('mpc_LinDx', self.F)
 
 
         #change of coordinates
         return nominal_states, nominal_actions, nominal_objs
     
-    def solve_inertia_coor(self, stance_leg, Lx_offset, Ly_des, Tr, torso_ori):
-        pos = self._robot.get_com_pos()
-        vel = self._robot.get_com_lin_vel()
-        lfoot_pos = self._robot.get_link_iso("r_foot_contact")[:, 0:3, 3]
-        rfoot_pos = self._robot.get_link_iso("l_foot_contact")[:, 0:3, 3]
-
+    def solve_inertia_coor(self, stance_leg, Lx_offset, Ly_des, Tr, torso_ori,
+                           pos, vel, lfoot_pos, rfoot_pos):
         stleg_pos = torch.zeros(self.n_batch, 3)
-
         for i in range(self.n_batch):
             if(stance_leg[i] == 1):
                 stleg_pos[i] = rfoot_pos[i]
             else:
                 stleg_pos[i] = lfoot_pos[i]
 
-        stleg_pos = stleg_pos.to(torso_ori.dtype)
+        #stleg_pos = stleg_pos.to(torso_ori.dtype)
         pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), pos.unsqueeze(2)).squeeze()
         vel_torso_ori = torch.matmul(torso_ori.transpose(1,2), vel.unsqueeze(2)).squeeze()
         stleg_pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), stleg_pos.unsqueeze(2)).squeeze()
-
+        
         x = pos_torso_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
-        #_x = torch.cat((x, self._zH), dim = 1) 
 
-        L = self.mass*torch.linalg.cross(pos_torso_ori, vel_torso_ori)
+        if self._b_data_save:
+            swfoot_pos = torch.zeros(self.n_batch, 3)
+            for i in range(self.n_batch):
+                if(stance_leg[i] == 1):
+                    swfoot_pos[i] = lfoot_pos[i]
+                else:
+                    swfoot_pos[i] = rfoot_pos[i]
+            swfoot_pos_ori = torch.matmul(torso_ori.transpose(1,2), swfoot_pos.unsqueeze(2)).squeeze()
+            swf_pos = swfoot_pos_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
+            self._data_saver.add('mpc_sw_foot_pos', swf_pos)
+
+
+        _x = torch.cat((x, self._zH*torch.ones(self.n_batch).unsqueeze(1)), dim = 1) 
+
+        L = self.mass*torch.linalg.cross(_x, vel_torso_ori)
 
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
         states, actions, objc = self.solve_mpc_coor(stance_leg, x, Lx_offset, Ly_des, Tr)
@@ -237,13 +249,13 @@ class ALIPtorch_mpc():
 
 
         #desired state
-        self.l = torch.sqrt(self.g/self._zH)
+        self.l = math.sqrt(self.g/self._zH)
         q1 = -2/self.mass/self._zH/self.l * torch.tanh(self.l*self.Ts/2) * self.Ly_des
         #leg dependent desired state
-        q2_plus = self.w
-        q2_minus = -self.w
-        q3_plus = -self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
-        q3_minus = self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
+        q2_plus = 10*self.w
+        q2_minus = -10*self.w
+        q3_plus = -10*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
+        q3_minus = 10*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
         q4 = -2*self.Ly_des
 
 
@@ -268,11 +280,11 @@ class ALIPtorch_mpc():
         self.q_plus[self.Ns-1,:,0] = 100*q1
         self.q_minus[self.Ns-1,:,0] = 100*q1
 
-        self.q_plus[self.Ns-1,:,1] = 100*self.q_minus[self.Ns-2,:,1]
-        self.q_minus[self.Ns-1,:,1] = 100*self.q_plus[self.Ns-2,:,1]
+        self.q_plus[self.Ns-1,:,1] = 2*self.q_minus[self.Ns-2,:,1]
+        self.q_minus[self.Ns-1,:,1] = 2*self.q_plus[self.Ns-2,:,1]
 
-        self.q_plus[self.Ns-1,:,2] = 100*self.q_minus[self.Ns-2,:,2]
-        self.q_minus[self.Ns-1,:,2] = 100*self.q_plus[self.Ns-2,:,2]
+        self.q_plus[self.Ns-1,:,2] = 2*self.q_minus[self.Ns-2,:,2]
+        self.q_minus[self.Ns-1,:,2] = 2*self.q_plus[self.Ns-2,:,2]
 
         self.q_plus[self.Ns-1,:,3] = 100*q4
         self.q_minus[self.Ns-1,:,3] = 100*q4
@@ -296,198 +308,6 @@ class ALIPtorch_mpc():
 
         self.F = torch.cat((exp_At, AtB), dim = 1)  
         self.F = self.F.repeat(self.Ns, self.n_batch, 1,1) 
-
-
-    
-
-
-
-
-
-
-
-    def get_frame(self, state):
-        assert len(state) == 6
-        x, y, Lx, Ly , ufp, ufp2= torch.unbind(state)
-        x = x.numpy()
-        y = y.numpy()
-
-        fig, ax = plt.subplots(figsize=(6,6))
-
-
-        ax.scatter(x,y,color='k', marker = 'x', s=50)
-        ax.set_xlim((-3, 3))
-        ax.set_ylim((-3, 3))
-        ax.set_xlabel('X-axis')
-        ax.set_ylabel('Y-axis')   
-        return fig, ax
-
-    def plot_mpc_traj(self, state, u):
-        fig = plt.subplots
-        x, y, Lx, Ly = torch.unbind(state, dim = 2)
-        ux, uy = torch.unbind(u, dim = 2)
-
-        n_row = int(math.sqrt(self.n_batch))
-        n_col = n_row+1
-
-        #plot control evolution this is wrong
-        ev_ux = torch.cumsum(ux, dim = 0)
-        ev_uy = torch.cumsum(uy, dim = 0)
-        print("ux", ux)
-        print("ev_ux", ev_ux)
-
-        ev_ux = torch.cat([torch.zeros(1, self.n_batch), ev_ux], dim=0)
-        print(ev_ux)
-        ev_uy = torch.cat([torch.zeros(1, self.n_batch), ev_uy], dim=0)
-        h_ev_ux_1 = ev_ux[0:self.Ns+1:2 , :]
-        h_ev_ux_2 = ev_ux[1:self.Ns+1:2 , :]
-        h_ev_uy_1 = ev_uy[0:self.Ns+1:2 , :]
-        h_ev_uy_2 = ev_uy[1:self.Ns+1:2 , :]
-
-        print("h 1", h_ev_ux_1)
-        print("h 2", h_ev_ux_2)
-
-        ev_x = x + ev_ux[:-1, :]
-        ev_y = y + ev_uy[:-1, :]
-
-        fig, ax = plt.subplots(n_row, n_col, figsize=(20,20), sharex = True, sharey = True)
-        for i in range(self.n_batch):
-            row = i // n_col
-            col = i% n_col
-            ax[row,col].plot(h_ev_ux_1[:,i].numpy(), h_ev_uy_1[:,i].numpy(), marker = 'x', color = 'r', label = 'second swing leg')
-            ax[row,col].plot(h_ev_ux_2[:,i].numpy(), h_ev_uy_2[:,i].numpy(), marker = 'x', color = 'b', label = 'first swing leg')
-            ax[row,col].plot(ev_x[:,i].numpy(), ev_y[:,i].numpy(), marker = 'x', color = 'black', label = 'COM')
-            ax[row,col].set_title(f'Batch {i}')
-            ax[row, col].set_xlabel('X')
-            ax[row, col].set_ylabel('Y')
-            ax[row, col].set_aspect('equal')
-            ax[row,col].legend()
-
-        fig.suptitle(f'with starting leg {self.initial_stance_leg}') 
-        plt.savefig('alip_mpc_pytorch_sol')
-
-        fig, ax = plt.subplots(n_row, n_col, figsize=(20,20), sharex = True, sharey = True)
-        Lx_plus = 0.5*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) + self.Lx_offset
-        Lx_minus = -0.5*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) + self.Lx_offset
-
-        for i in range(self.n_batch):
-            row = i // n_col
-            col = i% n_col
-            ax[row,col].plot(range(self.Ns), Lx[:,i].numpy(), marker = 'x', color = 'r', label = 'Lx')
-            ax[row,col].plot(range(self.Ns), Ly[:,i].numpy(), marker = 'x', color = 'b', label = 'Ly')
-            ax[row,col].plot(range(self.Ns), self.Ly_des*torch.ones(self.Ns).numpy() , color = 'cyan', label = 'Ly_des')
-            ax[row,col].plot(range(self.Ns), Lx_plus*torch.ones(self.Ns).numpy(), color = 'orange', label = 'Lx_des')
-            ax[row,col].plot(range(self.Ns), Lx_minus*torch.ones(self.Ns).numpy(), color = 'orange')
-            ax[row,col].set_title(f'Batch {i}')
-            ax[row, col].set_xlabel('X')
-            ax[row, col].set_ylabel('Y')
-            ax[row, col].set_aspect('equal')
-            ax[row,col].legend()
-
-
-        fig.suptitle(f'Ly_des = {self.Ly_des}; Lx = ')
-        plt.savefig('alip_mpc_pytorch_angular')
-
-        fig, ax = plt.subplots(n_row, n_col, figsize=(20,20), sharex = True, sharey = True)
-        for i in range(self.n_batch):
-            row = i // n_col
-            col = i% n_col
-            ax[row,col].plot(range(self.Ns), ux[:,i].numpy(), marker = 'x', color = 'r', label = 'u_x')
-            ax[row,col].plot(range(self.Ns), self.u_upper[:,i,0].numpy() , color = 'cyan', label = 'upper bound')
-            ax[row,col].plot(range(self.Ns), self.u_lower[:,i,0].numpy(), color = 'orange', label = 'lower bound')
-            ax[row,col].set_title(f'Batch {i}')
-            ax[row, col].set_xlabel('X')
-            ax[row, col].set_ylabel('Y')
-            #ax[row, col].set_aspect('equal')
-            ax[row,col].legend()
-
-
-        fig.suptitle(f'Ux stance sign = {self.stance_sign}')
-        plt.savefig('alip_mpc_control_x')
-        """
-        b1=self.u_upper_minus[:,i,1].numpy()
-        b2=self.u_lower_minus[:,i,1].numpy()
-        it=np.arange(-0.5,self.Ns-0.5,1)
-        IT = np.c_[it[:-1], it[1:], it[1:]]
-        B1 = np.c_[b1[:-1], b1[:-1], np.zeros_like(IT[:-1])*np.nan]
-        B2 = np.c_[b2[:-1], b2[:-1], np.zeros_like(IT[:-1])*np.nan]
-        """
-        fig, ax = plt.subplots(n_row, n_col, figsize=(20,20), sharex = True, sharey = True)
-        for i in range(self.n_batch):
-            a = np.arange(-0.5,self.Ns-0.5,1)
-            row = i // n_col
-            col = i% n_col
-            ax[row,col].scatter(range(self.Ns), uy[:,i].numpy(), marker = 'x', color = 'r', label = 'u_y')
-            ax[row,col].plot(np.arange(-0.5,self.Ns-0.5,1), self.u_upper[:,i,1].numpy(), drawstyle="steps-post", color = 'orange', label = 'upper bound')
-            ax[row,col].plot(np.arange(-0.5,self.Ns-0.5,1), self.u_lower[:,i,1].numpy(), drawstyle="steps-post", color = 'orange', label = 'lower bound')
-            ax[row,col].set_title(f'Batch {i}')
-            ax[row, col].set_xlabel('X')
-            ax[row, col].set_ylabel('Y')
-            #ax[row, col].set_aspect('equal')
-            ax[row,col].legend(loc='upper center')
-
-
-        fig.suptitle(f'Uy stance sign = {self.stance_sign}')
-        plt.savefig('alip_mpc_control_y')
-
-
-
-
-
-
-class indata():
-    def __init__(self):
-        self.Ts = 0.25
-        self.Tr = 0.25
-        self.mass = 39.15342
-        self.zH = 0.7
-
-        #self.state = torch.tensor([1,2,3,4])
-
-        self.g = 9.81
-        self.w = 0.13
-        self.stance_leg = -1
-        self.Lx_offset = 0.
-        self.Ly_des = 6.
-
-def uniform(shape, low, high):
-    r = high-low
-    return torch.rand(shape)*r+low
-    
-
-if __name__ == '__main__':
-    _indata = indata()
-    n_batch, Ns = 6, 6   #Ns = T in mpc formulation
-
-    n_state = 4
-    n_ctrl = 2
-    a = ALIP_mpc_torch_LinDx(Ns, 1, _indata, n_batch)
-    x = uniform(n_batch, -0.1, 0.1)
-    #Lx = uniform(n_batch, -0.005, 0.005)
-    #Ly = uniform(n_batch, -0.005, 0.005)
-    Lx = torch.zeros(n_batch)
-    Ly = torch.zeros(n_batch)
-    
-    torch.manual_seed(0)   
-    if (_indata.stance_leg == -1): #left stance COMy < 0
-        y = uniform(n_batch, -0.1, 0)
-
-    else: #right stance COMy > 0
-        y = uniform(n_batch, 0, 0.1)
-
-
-    Lx = torch.zeros(n_batch)
-    Ly = torch.zeros(n_batch)
-    x = torch.zeros(n_batch)
-    #y = torch.zeros(n_batch)
-
-    x = torch.stack((x,y,Lx,Ly), dim = 1)
-
-
-    nom_state, nom_u, nom_obj = a.solve(x, _indata)
-    #print("state", nom_state)
-    a.plot_mpc_traj(nom_state, nom_u)
-    print(nom_u)
 
 
 

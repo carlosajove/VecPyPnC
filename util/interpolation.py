@@ -248,31 +248,41 @@ class AlipSwing2(object): # input is batched
                                             self._end_pos[:, 2], self._duration)
     
     def evaluate(self, t):
-        s = t/self._duration
+        _t = torch.min(t, self._duration)  
+
+        s = _t/self._duration
+        #if s > 1 return end pos
 
         #x = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 0] + (1-torch.cos(math.pi*s))*self._end_pos[:, 0])
         #y = 0.5*((1+torch.cos(math.pi*s))*self._start_pos[:, 1] + (1-torch.cos(math.pi*s))*self._end_pos[:, 1])
 
         x = 0.5*(self._start_pos[:, 0] + self._end_pos[:, 0] + torch.cos(math.pi*s)*(self._start_pos[:, 0] - self._end_pos[:, 0]))
         y = 0.5*(self._start_pos[:, 1] + self._end_pos[:, 1] + torch.cos(math.pi*s)*(self._start_pos[:, 1] - self._end_pos[:, 1]))
-
-        z = self.z_curve.evaluate(t)
+        z = self.z_curve.evaluate(_t)
 
         return torch.stack((x,y,z), dim = 1)
     
     def evaluate_first_derivative(self, t):
-        s = t/self._duration
-        x = 0.5*math.pi*torch.cos(math.pi*s)/self._duration*(self._end_pos[:, 0] - self._start_pos[:, 0])
-        y = 0.5*math.pi*torch.cos(math.pi*s)/self._duration*(self._end_pos[:, 1] - self._start_pos[:, 1])
-        z = self.z_curve.evaluate_first_derivative(t)
+        _t = torch.min(t, self._duration)  
+        s = _t/self._duration
+        #if s > 1 return end pos
+
+        x = 0.5*math.pi*torch.sin(math.pi*s)/self._duration*(self._end_pos[:, 0] - self._start_pos[:, 0])
+        y = 0.5*math.pi*torch.sin(math.pi*s)/self._duration*(self._end_pos[:, 1] - self._start_pos[:, 1])
+        
+        z = self.z_curve.evaluate_first_derivative(_t)
 
         return torch.stack((x, y, z), dim = 1)
     
     def evaluate_second_derivative(self, t):
-        s = t/self._duration
+        _t = torch.min(t, self._duration)  
+        s = _t/self._duration
+        #if s > 1 return end pos
+        s = torch.min(s, torch.tensor(1.0))
+
         x = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 0] - self._start_pos[:, 0])
         y = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 1] - self._start_pos[:, 1])
-        z = self.z_curve.evaluate_second_derivative(t)
+        z = self.z_curve.evaluate_second_derivative(_t)
 
         return torch.stack((x, y, z), dim = 1)
 
