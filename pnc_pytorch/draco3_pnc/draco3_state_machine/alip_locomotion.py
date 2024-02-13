@@ -19,7 +19,7 @@ Control fREQ
 
 class AlipLocomotion(StateMachine):
     def __init__(self, batch, id, tm, alip_mpc, tci_container, robot, data_save = False):
-        self.n_batch = batch
+        self._n_batch = batch
         self._robot = robot
         self._trajectory_manager = tm
         self._alip_mpc = alip_mpc
@@ -27,10 +27,10 @@ class AlipLocomotion(StateMachine):
         self._sp = Draco3StateProvider()
 
         #params after will implement in set params
-        self._stance_leg = AlipParams.INITIAL_STANCE_LEG * torch.ones(self.n_batch)
-        self._Ts = AlipParams.TS * torch.ones(self.n_batch)
-        self._Lx_offset = AlipParams.LX_OFFSET * torch.ones(self.n_batch)
-        self._Ly_des = AlipParams.LY_DES * torch.ones(self.n_batch)
+        self._stance_leg = AlipParams.INITIAL_STANCE_LEG * torch.ones(self._n_batch)
+        self._Ts = AlipParams.TS * torch.ones(self._n_batch)
+        self._Lx_offset = AlipParams.LX_OFFSET * torch.ones(self._n_batch)
+        self._Ly_des = AlipParams.LY_DES * torch.ones(self._n_batch)
 
 
         self._b_data_save = data_save
@@ -45,23 +45,29 @@ class AlipLocomotion(StateMachine):
 
     def new_step(self):
         self._trajectory_manager.stance_leg = self._stance_leg
+        self._state_machine_start_time = self._sp.curr_time
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
 
         self._Tr = self._Ts - self._state_machine_time
+        #self._trajectory_manager.des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch)
 
-        #self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
+        self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
         torso_ori = self._trajectory_manager.des_torso_rot
 
-
-        self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg, self._Lx_offset, self._Ly_des, self._Tr, torso_ori)
+        com_pos = self._robot.get_com_pos()
+        com_vel = self._robot.get_com_lin_vel()
+        rfoot_pos = self._robot.get_link_iso("r_foot_contact")[:, 0:3, 3]
+        lfoot_pos = self._robot.get_link_iso("l_foot_contact")[:, 0:3, 3]
+        self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg, self._Lx_offset, self._Ly_des, self._Tr, torso_ori,
+                                                             com_pos, com_vel, lfoot_pos, rfoot_pos)
 
         self._trajectory_manager.generateSwingFtraj(self._state_machine_time, self._Tr, self._swfoot_end)
 
-        new_rf_z_max_rfoot = torch.zeros(self.n_batch)
-        new_rf_z_max_lfoot = torch.zeros(self.n_batch)
+        new_rf_z_max_rfoot = torch.zeros(self._n_batch)
+        new_rf_z_max_lfoot = torch.zeros(self._n_batch)
         b_lf_contact_h = self._sp.b_lf_contact
         b_rf_contact_h = self._sp.b_rf_contact
-        for i in range(self.n_batch):
+        for i in range(self._n_batch):
             if (self._stance_leg[i] == 1):
                 """
                 self._sp._b_lf_contact[i] = False
@@ -69,8 +75,8 @@ class AlipLocomotion(StateMachine):
                 """
                 b_lf_contact_h[i] = False
                 b_rf_contact_h[i] = True
-                new_rf_z_max_rfoot[i] = 500
-                new_rf_z_max_lfoot[i] = 0
+                new_rf_z_max_rfoot[i] = AlipParams.RF_Z_MAX
+                new_rf_z_max_lfoot[i] = 1e-4
             else:
                 """
                 self._sp._b_rf_contact[i] = False
@@ -78,8 +84,8 @@ class AlipLocomotion(StateMachine):
                 """
                 b_rf_contact_h[i] = False
                 b_lf_contact_h[i] = True
-                new_rf_z_max_lfoot[i] = 500
-                new_rf_z_max_rfoot[i] = 0
+                new_rf_z_max_lfoot[i] = AlipParams.RF_Z_MAX
+                new_rf_z_max_rfoot[i] = 1e-4
         self._sp.b_lf_contact = b_lf_contact_h
         self._sp.b_rf_contact = b_rf_contact_h
         #0 will be for rfoot_contact
@@ -94,7 +100,7 @@ class AlipLocomotion(StateMachine):
         self._trajectory_manager.updateDesired(t)
 
     def switchLeg(self):
-        print("Switch", self._sp.curr_time, self._sp.curr_time - self._state_machine_start_time)
+        #print("Switch", self._sp.curr_time, self._sp.curr_time - self._state_machine_start_time)
         indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)
         rfoot_z = self._robot.get_link_iso("r_foot_contact")[:, 2, 3]
         lfoot_z = self._robot.get_link_iso("l_foot_contact")[:, 2, 3]
@@ -104,7 +110,7 @@ class AlipLocomotion(StateMachine):
         for i in indices:
             if self._stance_leg[i] == 1 and lfoot_z[i] < 0.0005:
                 self._stance_leg[i] = -1
-                lfoot_rf_max[i] = 500
+                lfoot_rf_max[i] = AlipParams.RF_Z_MAX
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
                 res = True
@@ -114,7 +120,7 @@ class AlipLocomotion(StateMachine):
 
             elif self._stance_leg[i] == -1 and rfoot_z[i] < 0.0005:
                 self._stance_leg[i] = 1
-                rfoot_rf_max[i] = 500
+                rfoot_rf_max[i] = AlipParams.RF_Z_MAX
                 self._state_machine_start_time = self._sp.curr_time
                 print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
                 res = True
