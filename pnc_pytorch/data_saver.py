@@ -33,6 +33,7 @@ class DataSaver(metaclass=MetaSingleton):
 
     def advance(self):
         pickle.dump(self._history, self._file)
+        self._history = {}
 
     def close(self):
         self._file.close()

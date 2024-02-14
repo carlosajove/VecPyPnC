@@ -13,6 +13,9 @@ from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
 from pnc_pytorch.planner.locomotion.alip_mpc import ALIPtorch_mpc
+from pnc_pytorch.planner.locomotion.alip_mpc_com import ALIPcomtorch_mpc
+from pnc_pytorch.planner.locomotion.alip_mpc_mixed import ALIPmixedtorch_mpc
+
 from pnc_pytorch.wbc.manager.ALIP_trajectory_manager import ALIPtrajectoryManager
 from pnc_pytorch.wbc.manager.floating_base_trajectory_manager import FloatingBaseTrajectoryManager
 
@@ -39,7 +42,8 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # Initialize Planner
         # ======================================================================
         self._alip_mpc = ALIPtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
-
+        self._alip_com_mpc = ALIPcomtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
+        self._alip_mixed_mpc = ALIPmixedtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
         # ======================================================================
         # Initialize Task Manager
         # ======================================================================
