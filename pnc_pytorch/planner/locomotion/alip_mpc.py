@@ -67,6 +67,13 @@ class ALIPtorch_mpc():
 
         self.getLinDinF()
 
+        #Get PARAMS FOR COST
+        self._px = AlipParams.PX
+        self._py = AlipParams.PY
+        self._pLx = AlipParams.PLX
+        self._pLy = AlipParams.PLY
+        self._pbound = AlipParams.PBOUND
+
         self.getCost(True) #if True use eps instead of 0 
 
     
@@ -75,6 +82,7 @@ class ALIPtorch_mpc():
         self.ufp_y_max = AlipParams.UFP_Y_MAX
         self.ufp_y_min = AlipParams.UFP_Y_MIN
         self.get_u_bounds()
+
 
       
 
@@ -96,20 +104,17 @@ class ALIPtorch_mpc():
         exp_Atr = torch.linalg.matrix_exp(self._A.expand(self.n_batch,-1, -1)*self.Tr.view(-1, 1, 1)) 
         x = x.to(exp_Atr.dtype)
         x_0 = torch.matmul(exp_Atr, x.unsqueeze(2)).squeeze()
-        #x_0 = x
+        x_0 = x
 
         #TODO: look at code status about the problem with this
         if(self.stance_sign[0] == 1): #set bounds TODO:CHECK f is the good one
             self.u_lower = self.u_lower_plus
             self.u_upper = self.u_upper_plus
-            self.q = self.q_minus
-            
-            #self.q = self.q_plus
+            self.q = self.q_plus
         else: #first left swing  
             self.u_lower = self.u_lower_minus
             self.u_upper = self.u_upper_minus
-            self.q = self.q_plus
-            #self.q = self.q_minus
+            self.q = self.q_minus
 
         #self.u_lower = None
         #self.u_upper = None
@@ -119,15 +124,14 @@ class ALIPtorch_mpc():
                 u_init= self.u_init,
                 u_lower= self.u_lower, u_upper= self.u_upper,
                 lqr_iter=50,
-                verbose=1,
+                verbose=-1,
                 exit_unconverged=False,
                 detach_unconverged=False,
                 grad_method=GradMethods.ANALYTIC,
                 eps=1e-2,
             )(x_0, QuadCost(self.Q, self.q), LinDx(self.F))
-        #self.up_u_init(nominal_actions)
-        print("input", x_0)
-        print("action: ", nominal_actions[0])
+        self.up_u_init(nominal_actions)
+
 
         if self._b_data_save:
             self._data_saver.add('mpc_actions', nominal_actions)
@@ -179,8 +183,7 @@ class ALIPtorch_mpc():
         _x = torch.cat((x, self._zH*torch.ones(self.n_batch).unsqueeze(1)), dim = 1) 
                 
         vel_torso_ori[:,2] = torch.zeros(self.n_batch)
-        print("position", _x)
-        print("vel_torso_ori", vel_torso_ori)
+
         L = self.mass*torch.linalg.cross(_x, vel_torso_ori)
 
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
@@ -238,6 +241,7 @@ class ALIPtorch_mpc():
 
 
     def getCost(self, bool_eps): #cost is checked 
+        """
         self.Qrunning = 2*torch.eye(self.n_state + self.n_ctrl)
         self.Qterminal = 2*100*torch.eye(self.n_state + self.n_ctrl)
         for i in range(self.n_state, self.n_state + self.n_ctrl): #i = 4, i =5
@@ -247,7 +251,15 @@ class ALIPtorch_mpc():
             else:
                 self.Qrunning[i,i] = 0
                 self.Qterminal[i,i] = 0     
+        """
+        self.Qrunning = 2*torch.tensor([[self._px + self._pbound, 0, 0, 0, 0, 0],
+                                        [ 0, self._py + self._pbound, 0, 0, 0, 0],
+                                        [ 0, 0, self._pLx, 0, 0, 0],
+                                        [ 0, 0, 0, self._pLy, 0, 0],
+                                        [ 0, 0, 0, 0, self.eps, 0],
+                                        [ 0, 0, 0, 0, 0, self.eps]])
 
+        self.Qterminal = 100*self.Qrunning
         h = self.Qrunning.unsqueeze(0).unsqueeze(0).repeat(self.Ns-1, self.n_batch, 1, 1)
         Qt = self.Qterminal.repeat(1, self.n_batch, 1, 1)
         self.Q = torch.cat((h, Qt), 0)
@@ -255,13 +267,14 @@ class ALIPtorch_mpc():
 
         #desired state
         self.l = math.sqrt(self.g/self._zH)
-        q1 = -2/self.mass/self._zH/self.l * torch.tanh(self.l*self.Ts/2) * self.Ly_des
+
+        q1 = self._px*(-2/self.mass/self._zH/self.l * torch.tanh(self.l*self.Ts/2) * self.Ly_des)
         #leg dependent desired state
-        q2_plus = 10*self.w
-        q2_minus = -10*self.w
-        q3_plus = -10*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
-        q3_minus = 10*self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset
-        q4 = -2*self.Ly_des
+        q2_plus = self._py *self.w
+        q2_minus = self._py * (-self.w)
+        q3_plus = self._pLx * (-self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset)
+        q3_minus = self._pLx * (self.mass*self._zH*self.l*self.w*torch.sqrt(self.l*self.Ts*0.5) - 2*self.Lx_offset)
+        q4 = self._pLy * (-2*self.Ly_des)
 
 
         self.q_plus = torch.zeros(self.Ns, self.n_batch, self.n_state+self.n_ctrl)  #initial right stance /left swing
@@ -285,11 +298,11 @@ class ALIPtorch_mpc():
         self.q_plus[self.Ns-1,:,0] = 100*q1
         self.q_minus[self.Ns-1,:,0] = 100*q1
 
-        self.q_plus[self.Ns-1,:,1] = 2*self.q_minus[self.Ns-2,:,1]
-        self.q_minus[self.Ns-1,:,1] = 2*self.q_plus[self.Ns-2,:,1]
+        self.q_plus[self.Ns-1,:,1] = 100*self.q_minus[self.Ns-2,:,1]
+        self.q_minus[self.Ns-1,:,1] = 100*self.q_plus[self.Ns-2,:,1]
 
-        self.q_plus[self.Ns-1,:,2] = 2*self.q_minus[self.Ns-2,:,2]
-        self.q_minus[self.Ns-1,:,2] = 2*self.q_plus[self.Ns-2,:,2]
+        self.q_plus[self.Ns-1,:,2] = 100*self.q_minus[self.Ns-2,:,2]
+        self.q_minus[self.Ns-1,:,2] = 100*self.q_plus[self.Ns-2,:,2]
 
         self.q_plus[self.Ns-1,:,3] = 100*q4
         self.q_minus[self.Ns-1,:,3] = 100*q4
@@ -311,7 +324,15 @@ class ALIPtorch_mpc():
         exp_At = torch.linalg.matrix_exp(self._A*self.dt) 
         AtB = torch.matmul(exp_At, B)
 
-        self.F = torch.cat((exp_At, AtB), dim = 1)  
+        #self.F = torch.cat((exp_At, AtB), dim = 1)  
+        """
+        F0 = torch.cat((torch.eye(4), B), dim = 1).unsqueeze(0)
+        F = torch.cat((exp_At, B), dim = 1).repeat(self.Ns-1, 1, 1)
+        self.F = torch.cat((F0, F), dim = 0).unsqueeze(1).repeat(1, self.n_batch, 1, 1)
+        print(self.F)
+        """
+
+        self.F = torch.cat((exp_At, B), dim = 1)  
         self.F = self.F.repeat(self.Ns, self.n_batch, 1,1) 
 
 

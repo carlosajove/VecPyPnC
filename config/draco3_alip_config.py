@@ -12,7 +12,7 @@ class SimConfig(object):
 
     PRINT_TIME = False
     PRINT_ROBOT_INFO = True
-    VIDEO_RECORD = True
+    VIDEO_RECORD = False
     RECORD_FREQ = 1
     SIMULATE_CAMERA = False
     SAVE_CAMERA_DATA = False
@@ -34,7 +34,7 @@ class WBCConfig(object):
     RF_Z_MAX = 1000.0
 
     # Task Hierarchy Weights
-    W_COM = 100.0
+    W_COM = 80.0
     W_TORSO = 60.0
     W_UPPER_BODY = 20.0
     W_CONTACT_FOOT = 60.0
@@ -60,7 +60,7 @@ class WBCConfig(object):
 
     KP_FOOT_POS = torch.tensor([2000., 2000., 1000.])
     KD_FOOT_POS = torch.tensor([100., 100., 30.])
-    KP_FOOT_ORI = torch.tensor([300., 300., 300.])
+    KP_FOOT_ORI = torch.tensor([1000., 1000., 1000.])
     KD_FOOT_ORI = torch.tensor([30., 30., 30.])
 
     # Regularization terms
@@ -91,20 +91,38 @@ class WalkingState(object):
 
 class AlipParams(object):
     N_BATCH = 3
-    TS = 0.2
+    TS = 0.25
     NT = 4
     NS = 10
     MASS = 39.1
-    ZH = 0.69
-    WIDTH = 0.15
+    ZH = 0.68
+    WIDTH = 0.25
     G = 9.81
-    UFP_X_MAX = 0.3
+    UFP_X_MAX = 0.6
     UFP_Y_MAX = 0.4
-    UFP_Y_MIN = 0.05
+    UFP_Y_MIN = 0.08
     LX_OFFSET = 0.
-    LY_DES = 0.
+    LY_DES = -4.
     INITIAL_STANCE_LEG = -1
-    SWING_HEIGHT = 0.04
+    SWING_HEIGHT = 0.05
     COM_YAW = 0.
+
+    PX = 1.
+    PY = 1.
+    PLX = 20.
+    PLY = 20.
+    PBOUND = 5.
+
+    """
+    COM
+    """
+    UCOM_X_MAX = 0.4
+    UCOM_Y_EXT = 0.3
+    UCOM_Y_INT = 0.1
+
+    """
+    Mixed
+    """
+    ALPHA = 0.7
 
     RF_Z_MAX = 1000.0
