@@ -3,7 +3,9 @@ from scipy.spatial.transform import Slerp
 import torch
 import numpy as np
 
+
 from util import util
+from util import orbit_util
 from pnc_pytorch.wbc.task import Task
 from pnc_pytorch.data_saver import DataSaver
 
@@ -78,38 +80,26 @@ class BasicTask(Task):
                 self._data_saver.add(self._target_id + '_vel', vel_act.clone())
                 self._data_saver.add('w_' + self._target_id, self._w_hierarchy)
         elif self._task_type == "LINK_ORI":
-            """--------------------------
-            TODO: use orbit functions instead of scipy rotations
-            -----------------------------"""
-            pos_des_np = self._pos_des[0, :].numpy()
-            quat_des = R.from_quat(pos_des_np)
-            """
-            quat_act = R.from_matrix(
-                self._robot.get_link_iso(self._target_id)[:, 0:3, 0:3])
-            """
-            quat_act = R.from_matrix(self._robot.get_link_iso(self._target_id)[0, 0:3, 0:3].numpy())
-            quat_des_temp = quat_des.as_quat()
-            quat_act_temp = quat_act.as_quat()
-            quat_act_temp = util.prevent_quat_jump(quat_des_temp,
-                                                   quat_act_temp)
-            quat_act = R.from_quat(quat_act_temp)
-            quat_err = R.from_matrix(
-                np.dot(quat_des.as_matrix(),
-                       quat_act.as_matrix().transpose())).as_quat()
-            self._pos_err = util.quat_to_exp(quat_err)
+            mat_act = self._robot.get_link_iso(self._target_id)[:, 0:3, 0:3]
+            quat_act = orbit_util.convert_quat(orbit_util.quat_from_matrix(mat_act))
+            quat_act_temp_h = util.prevent_quat_jump_pytorch(self._pos_des,
+                                                             quat_act)
+            mat_act = orbit_util.matrix_from_quat(orbit_util.convert_quat(quat_act_temp_h, to = "wxyz" ))
+            mat_des = orbit_util.matrix_from_quat(orbit_util.convert_quat(self._pos_des, to ="wxyz"))
+            mat_act = mat_act.to(mat_des.dtype)
 
-            #TODO: change when orbit
-            self._pos_err = torch.from_numpy(self._pos_err).expand(self.n_batch, -1).float()
+            quat_err = orbit_util.convert_quat(orbit_util.quat_from_matrix(torch.bmm(mat_des, mat_act.transpose(1,2))))
 
+            self._pos_err = util.quat_to_exp_pytorch(quat_err)
             vel_act = self._robot.get_link_vel(self._target_id)[:, 0:3]
 
             if self._b_data_save:
                 self._data_saver.add(self._target_id + '_quat_des',
-                                     torch.from_numpy(quat_des.as_quat()).expand(self.n_batch, -1))
+                                     self._pos_des)
                 self._data_saver.add(self._target_id + '_ang_vel_des',
                                      self._vel_des.clone())
                 self._data_saver.add(self._target_id + '_quat',
-                                     torch.from_numpy(quat_act.as_quat()).expand(self.n_batch, -1))
+                                     quat_act)
                 self._data_saver.add(self._target_id + '_ang_vel',
                                      vel_act.clone())
                 self._data_saver.add('w_' + self._target_id + "_ori",

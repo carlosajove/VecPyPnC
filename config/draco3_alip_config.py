@@ -95,17 +95,17 @@ class AlipParams(object):
     NT = 4
     NS = 10
     MASS = 39.1
-    ZH = 0.68
+    ZH = 0.69
     WIDTH = 0.25
     G = 9.81
     UFP_X_MAX = 0.6
     UFP_Y_MAX = 0.4
     UFP_Y_MIN = 0.08
     LX_OFFSET = 0.
-    LY_DES = -4.
+    LY_DES = -2.
     INITIAL_STANCE_LEG = -1
     SWING_HEIGHT = 0.05
-    COM_YAW = 0.
+    COM_YAW = 8.
 
     PX = 1.
     PY = 1.

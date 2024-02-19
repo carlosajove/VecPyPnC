@@ -316,3 +316,21 @@ class QuadraticLagrangePol(object): #sizes are torhc.tensor([n_batch])
 
     def evaluate_second_derivative(self, t):
         return 2*(self._c0 + self._c1 + self._c2)
+
+#TODO: erase and do hermite
+class LinearQuatCurve():
+    def __init__(self, start_quat, end_quat, duration):
+        self._st_quat = start_quat
+        self._end_quat = end_quat
+        self._duration = duration
+        self._diff = (self._end_quat - self._st_quat)/self._duration.unsqueeze(1)
+
+    def evaluate(self, t):
+        return self._diff * t.unsqueeze(1) + self._st_quat
+
+    def evaluate_first_derivative(self, t):
+        #return self._diff
+        return torch.zeros(self._st_quat.shape[0], 3)
+
+    def evaluate_second_derivative(self, t):
+        return torch.zeros(self._st_quat.shape[0], 3)
