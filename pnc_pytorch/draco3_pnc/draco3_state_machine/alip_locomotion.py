@@ -49,7 +49,7 @@ class AlipLocomotion(StateMachine):
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
 
         self._Tr = self._Ts - self._state_machine_time
-        #self._trajectory_manager.des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch)
+        self._trajectory_manager.des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch)
 
         self._trajectory_manager.setNewOri() #TODO: TRAJECTORY FOR ORI
         torso_ori = self._trajectory_manager.des_torso_rot
@@ -86,6 +86,7 @@ class AlipLocomotion(StateMachine):
                 b_lf_contact_h[i] = True
                 new_rf_z_max_lfoot[i] = AlipParams.RF_Z_MAX
                 new_rf_z_max_rfoot[i] = 1e-4
+                
         self._sp.b_lf_contact = b_lf_contact_h
         self._sp.b_rf_contact = b_rf_contact_h
         #0 will be for rfoot_contact

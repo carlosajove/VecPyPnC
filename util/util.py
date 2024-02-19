@@ -74,17 +74,18 @@ def quat_to_exp(quat):
     return np.copy(ret * theta)
 
 def quat_to_exp_pytorch(quat):
-    img_vec = torch.tensor([quat[0], quat[1], quat[2]])
-    w = quat[3]
+    batch = quat.shape[0]
+    img_vec = torch.stack((quat[:, 0], quat[:, 1], quat[:, 2]), dim = 1)
+    w = quat[:, 3]
     theta = 2.0 * torch.asin(
-        torch.sqrt(img_vec[0] * img_vec[0] + img_vec[1] * img_vec[1] +
-                img_vec[2] * img_vec[2]))
+        torch.sqrt(img_vec[:, 0] * img_vec[:, 0] + img_vec[:, 1] * img_vec[:, 1] +
+                img_vec[:, 2] * img_vec[:, 2]))
 
-    if torch.abs(theta) < 1e-4:
-        return torch.zeros(3)
-    ret = img_vec / torch.sin(theta / 2.0)
+    #ret = torch.zeros_like(img_vec)
+    print("theta, ", theta)
+    ret = torch.where(torch.abs(theta) < 1e-4, torch.zeros(3), img_vec / torch.sin(theta / 2.0))
 
-    return torch.clone(ret * theta).detach()
+    return torch.clone(ret * theta)
 
 
 def exp_to_quat(exp):
