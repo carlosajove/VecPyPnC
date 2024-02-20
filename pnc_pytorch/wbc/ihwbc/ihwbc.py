@@ -49,7 +49,7 @@ class IHWBC(object):
 
         self._sf = sf
         self._snf = torch.cat((torch.zeros(
-            self.n_batch, self._n_active + self._n_passive, 6),
+            self.n_batch, self._n_active + self._n_passive, 6, dtype=torch.double),
             torch.eye(self._n_active + self._n_passive).unsqueeze(0).repeat(self.n_batch,1,1)),
                                    dim=2)
         self._sa = sa
@@ -319,7 +319,7 @@ class IHWBC(object):
         #ji 
         #TODO: check if b_internal_constraint depends on batch, right now assume same for all
         #TODO: check why ni
-        #print("rank ni", torch.linalg.matrix_rank(ni), ni.shape) 
+        #print("rank ni", torch.linalg.matrix_rank(ni), ni.shape)
         if contact_list is not None:
             eq_floating_mat = torch.cat(
                 (torch.bmm(self._sf, self._mass_matrix),
@@ -497,7 +497,7 @@ class IHWBC(object):
         print(torch.isnan(ineq_vec).any().item())  
         print(ineq_vec)
         """
-        sol = QPFunction(verbose = -1)(cost_mat, cost_vec, ineq_mat, ineq_vec, eq_mat, eq_vec).float()
+        sol = QPFunction(verbose = -1)(cost_mat, cost_vec, ineq_mat, ineq_vec, eq_mat, eq_vec)
 
 
         self.sol = sol

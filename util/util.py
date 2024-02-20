@@ -5,6 +5,7 @@ import numpy as np
 import json
 import multiprocessing as mp
 from tqdm import tqdm
+from util import orbit_util
 
 import torch 
 
@@ -74,6 +75,7 @@ def quat_to_exp(quat):
     return np.copy(ret * theta)
 
 def quat_to_exp_pytorch(quat):
+    #formalism is (x, y, z, w)
     batch = quat.shape[0]
     img_vec = torch.stack((quat[:, 0], quat[:, 1], quat[:, 2]), dim = 1)
     w = quat[:, 3]
@@ -82,7 +84,6 @@ def quat_to_exp_pytorch(quat):
                 img_vec[:, 2] * img_vec[:, 2]))
 
     #ret = torch.zeros_like(img_vec)
-    print("theta, ", theta)
     ret = torch.where(torch.abs(theta) < 1e-4, torch.zeros(3), img_vec / torch.sin(theta / 2.0))
 
     return torch.clone(ret * theta)
@@ -102,6 +103,16 @@ def exp_to_quat(exp):
         ret[2] = 0.5 * exp[2]
         ret[3] = 1.0
     return np.copy(ret)
+
+def exp_to_quat_pytorch(exp):
+    theta = torch.sqrt(exp[:, 0]*exp[:, 0] + exp[:, 1]*exp[:, 1] + exp[:, 2]*exp[:, 2])
+
+    ret = torch.where(theta.unsqueeze(1) > 1e-4, torch.stack((torch.sin(theta/2.0)*exp[:, 0] / theta,
+                                                              torch.sin(theta/2.0)*exp[:, 1] / theta,
+                                                              torch.sin(theta/2.0)*exp[:, 2] / theta,
+                                                              torch.cos(theta/2.0)), dim = 1), 
+                                                  torch.stack((0.5*exp[:, 0], 0.5*exp[:, 1], 0.5*exp[:, 2], torch.ones(exp.shape[0])), dim = 1))
+    return torch.clone(ret)
 
 
 def weighted_pinv(A, W, rcond=1e-15):
@@ -337,3 +348,38 @@ def rotationZ(theta, inMatrix):
     rotation_matrix = rotation_matrix.to(inMatrix.dtype) 
     res = torch.bmm(rotation_matrix, inMatrix)
     return res
+
+
+def log_quat_map(quat):
+    #assumes quat is normalized
+    #logarithm of batched quat as in:
+    # https://doi.org/10.1002/(SICI)1099-1778(199601)7:1<43::AID-VIS136>3.0.CO;2-T
+    #could use eps and torch.where instead of nan_to_num
+
+    batch = quat.shape[0]
+    theta = torch.acos(quat[:, 0])
+    sin = torch.linalg.vector_norm(quat[:, 1:4], dim = 1)
+    #theta = torch.where(sin > eps, theta, 0.)
+    #sin = torch.where(sin > eps, sin, 1.)
+    res = theta.unsqueeze(1)/sin.unsqueeze(1) * quat[:, 1:4]
+    #res = torch.cat((torch.zeros(batch).unsqueeze(1), res), dim = 1)
+    return torch.nan_to_num(res)
+
+def exp_quat_map(v):
+    # https://doi.org/10.1002/(SICI)1099-1778(199601)7:1<43::AID-VIS136>3.0.CO;2-T
+    # must be batch x 3d vector
+    #could use eps and torch.where instead of nan_to_num
+
+    norm = torch.linalg.vector_norm(v, dim = 1)
+    norm = torch.where(norm > 1e-5, norm, 0.)
+    res = torch.cat((torch.cos(norm).unsqueeze(1), (torch.sin(norm)/norm).unsqueeze(1) * v), dim = 1)
+    return torch.nan_to_num(res)
+
+
+def quat_mul_xyzw(q1, q2):
+    return orbit_util.convert_quat(orbit_util.quat_mul(
+                          orbit_util.convert_quat(q1, to = "wxyz"),
+                          orbit_util.convert_quat(q2, to = "wxyz")))
+
+def quat_inv_xyzw(q):
+    return orbit_util.convert_quat(orbit_util.quat_inv(orbit_util.convert_quat(q, to = "wxyz")))

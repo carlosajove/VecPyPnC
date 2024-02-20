@@ -25,8 +25,8 @@ class Draco3Controller(object):
         n_active = torch.count_nonzero(torch.tensor(act_list))
         n_passive = n_q_dot - n_active - 6
 
-        self._sa = torch.zeros((n_active, n_q_dot)).expand(self._n_batch, -1, -1)
-        self._sv = torch.zeros((n_passive, n_q_dot)).expand(self._n_batch, -1, -1)
+        self._sa = torch.zeros((n_active, n_q_dot), dtype=torch.double).expand(self._n_batch, -1, -1)
+        self._sv = torch.zeros((n_passive, n_q_dot), dtype=torch.double).expand(self._n_batch, -1, -1)
         j, k = 0, 0
         for i in range(n_q_dot):
             if i >= 6:
@@ -36,7 +36,7 @@ class Draco3Controller(object):
                 else:
                     self._sv[:, k, i] = 1.
                     k += 1
-        self._sf = torch.zeros((6, n_q_dot))
+        self._sf = torch.zeros((6, n_q_dot), dtype=torch.double)
         self._sf[0:6, 0:6] = torch.eye(6)
         self._sf = self._sf.expand(self._n_batch, -1, -1)
 
@@ -61,10 +61,10 @@ class Draco3Controller(object):
         """
 
         # Dynamics properties
-        mass_matrix = self._robot.get_mass_matrix().float()
-        mass_matrix_inv = torch.linalg.inv(mass_matrix).float()
-        coriolis = self._robot.get_coriolis().float()
-        gravity = self._robot.get_gravity().float()
+        mass_matrix = self._robot.get_mass_matrix()
+        mass_matrix_inv = torch.linalg.inv(mass_matrix)
+        coriolis = self._robot.get_coriolis()
+        gravity = self._robot.get_gravity()
 
 
 
