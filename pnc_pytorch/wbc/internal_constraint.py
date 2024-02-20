@@ -12,8 +12,8 @@ class InternalConstraint(abc.ABC):
         self._robot = robot
         self._dim = dim
         self.n_batch = n_batch
-        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot)
-        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim)
+        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot, dtype = torch.double)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim, dtype=torch.double)
 
     @property
     def jacobian(self):

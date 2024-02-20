@@ -65,6 +65,7 @@ class Draco3Interface(Interface):
 
         # Compute Cmd
         command = self._control_architecture.get_command()
+        #print("interface", command)
 
         if PnCConfig.SAVE_DATA and (self._count % PnCConfig.SAVE_FREQ == 0):
             self._data_saver.add('joint_pos', self._robot.joint_positions)

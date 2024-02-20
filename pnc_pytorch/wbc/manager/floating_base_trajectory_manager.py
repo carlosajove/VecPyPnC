@@ -6,6 +6,7 @@ from scipy.spatial.transform import Slerp
 
 from util import util
 from util import interpolation
+from util import orbit_util
 
 
 class FloatingBaseTrajectoryManager(object):
@@ -43,19 +44,14 @@ class FloatingBaseTrajectoryManager(object):
         self._ini_com_pos = self._robot.get_com_pos()
         self._target_com_pos = target_com_pos
 
-        #TODO: change when rot
-        target_base_quat = target_base_quat[0].numpy()
-        self._ini_base_quat = util.rot_to_quat(
-            self._robot.get_link_iso(self._base_ori_task.target_id)[0,0:3, 0:3].numpy())
+        self._ini_base_quat = orbit_util.convert_quat(orbit_util.quat_from_matrix(self._robot.get_link_iso(self._base_ori_task.target_id)[:, 0:3, 0:3]))
         self._target_base_quat = target_base_quat
-        # self._quat_error= (R.from_quat(self._target_base_quat) *
-        # R.from_quat(self._ini_base_quat).inv()).as_quat() # Sign flipped
-        self._quat_error = R.from_matrix(
-            np.dot(
-                R.from_quat(self._target_base_quat).as_matrix(),
-                R.from_quat(
-                    self._ini_base_quat).as_matrix().transpose())).as_quat()
-        self._exp_error = util.quat_to_exp(self._quat_error)
+
+        self._quat_error = util.quat_mul_xyzw(self._target_base_quat, util.quat_inv_xyzw(self._ini_base_quat))
+
+        self._exp_error = util.quat_to_exp_pytorch(self._quat_error)
+
+
 
         """
         np.set_printoptions(precision=5)
@@ -90,26 +86,21 @@ class FloatingBaseTrajectoryManager(object):
         scaled_tddot = interpolation.smooth_changing_acc_pytorch(
             torch.zeros(self._n_batch), torch.ones(self._n_batch), self._duration, current_time - self._start_time)
 
-
-
-        scaled_t = scaled_t[0].numpy()
-        scaled_tddot = scaled_tddot[0].numpy()
-        scaled_tdot = scaled_tdot[0].numpy()
+        scaled_t = scaled_t
+        scaled_tddot = scaled_tddot
+        scaled_tdot = scaled_tdot
         exp_inc = self._exp_error * scaled_t
-        quat_inc = util.exp_to_quat(exp_inc)
+        quat_inc = util.exp_to_quat_pytorch(exp_inc)
 
         # TODO (Check this again)
         # base_quat_des = R.from_matrix(
         # np.dot(
         # R.from_quat(quat_inc).as_matrix(),
         # R.from_quat(self._ini_base_quat).as_matrix())).as_quat()
-        base_quat_des = R.from_matrix(
-            np.dot(
-                R.from_quat(self._ini_base_quat).as_matrix(),
-                R.from_quat(quat_inc).as_matrix())).as_quat()
+
+        base_quat_des = util.quat_mul_xyzw(self._ini_base_quat, quat_inc)
+            
         base_angvel_des = self._exp_error * scaled_tdot
         base_angacc_des = self._exp_error * scaled_tddot
 
-        self._base_ori_task.update_desired(torch.from_numpy(base_quat_des).expand(self._n_batch, -1), 
-                                           torch.from_numpy(base_angvel_des).expand(self._n_batch, -1),
-                                           torch.from_numpy(base_angacc_des).expand(self._n_batch, -1))
+        self._base_ori_task.update_desired(base_quat_des, base_angvel_des, base_angacc_des)

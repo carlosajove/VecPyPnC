@@ -118,7 +118,6 @@ class ALIPtorch_mpc():
 
         #self.u_lower = None
         #self.u_upper = None
-
         nominal_states, nominal_actions, nominal_objs = mpc.MPC(
                 self.n_state, self.n_ctrl, self.Ns,
                 u_init= self.u_init,
@@ -154,7 +153,7 @@ class ALIPtorch_mpc():
     
     def solve_inertia_coor(self, stance_leg, Lx_offset, Ly_des, Tr, torso_ori,
                            pos, vel, lfoot_pos, rfoot_pos):
-        stleg_pos = torch.zeros(self.n_batch, 3)
+        stleg_pos = torch.zeros(self.n_batch, 3, dtype = torch.double)
         for i in range(self.n_batch):
             if(stance_leg[i] == 1):
                 stleg_pos[i] = rfoot_pos[i]
@@ -169,7 +168,7 @@ class ALIPtorch_mpc():
         x = pos_torso_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
 
         if self._b_data_save:
-            swfoot_pos = torch.zeros(self.n_batch, 3)
+            swfoot_pos = torch.zeros(self.n_batch, 3, dtype = torch.double)
             for i in range(self.n_batch):
                 if(stance_leg[i] == 1):
                     swfoot_pos[i] = lfoot_pos[i]
@@ -182,14 +181,14 @@ class ALIPtorch_mpc():
 
         _x = torch.cat((x, self._zH*torch.ones(self.n_batch).unsqueeze(1)), dim = 1) 
                 
-        vel_torso_ori[:,2] = torch.zeros(self.n_batch)
+        vel_torso_ori[:,2] = torch.zeros(self.n_batch, dtype = torch.double)
 
         L = self.mass*torch.linalg.cross(_x, vel_torso_ori)
 
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
         states, actions, objc = self.solve_mpc_coor(stance_leg, x, Lx_offset, Ly_des, Tr)
         #For now assume height is constant
-        next_action_torso_frame = torch.cat((actions[0, :, :], torch.zeros(self.n_batch, 1)), dim = 1)
+        next_action_torso_frame = torch.cat((actions[0, :, :], torch.zeros(self.n_batch, 1, dtype = torch.double)), dim = 1)
         next_action_torso_frame = next_action_torso_frame.to(torso_ori.dtype)
         next_action = torch.matmul(torso_ori, next_action_torso_frame.unsqueeze(2)).squeeze() + stleg_pos
 
@@ -200,14 +199,14 @@ class ALIPtorch_mpc():
         assert self.Ns%2 == 0 #Ns need to be even in order to work with the current implementation of the u_bounds
 
         self.u_upper_plus = torch.tensor([[ self.ufp_x_max/2, self.ufp_y_max], 
-                                     [ self.ufp_x_max/2, -self.ufp_y_min]])
+                                     [ self.ufp_x_max/2, -self.ufp_y_min]], dtype = torch.double)
         self.u_lower_plus = torch.tensor([[-self.ufp_x_max/2, self.ufp_y_min],
-                                     [-self.ufp_x_max/2, -self.ufp_y_max]])
+                                     [-self.ufp_x_max/2, -self.ufp_y_max]], dtype = torch.double)
 
         self.u_upper_minus = torch.tensor([[self.ufp_x_max/2, -self.ufp_y_min], 
-                                      [self.ufp_x_max/2, self.ufp_y_max]])
+                                      [self.ufp_x_max/2, self.ufp_y_max]], dtype = torch.double)
         self.u_lower_minus = torch.tensor([[-self.ufp_x_max/2,- self.ufp_y_max], 
-                                      [-self.ufp_x_max/2, self.ufp_y_min]])
+                                      [-self.ufp_x_max/2, self.ufp_y_min]], dtype = torch.double)
 
         """
         Since each robot can have different stance_legs, here they will not be batched
@@ -237,7 +236,7 @@ class ALIPtorch_mpc():
         Problem: last column is not inside the bounds, if doesn't work try  u[0, :, :].unsqueeze(0) instead
         """
         #self.u_init = u #u[mpcT, nbatch, 2]
-        self.u_init = torch.cat((u[1:self.Ns, :, :], torch.zeros(1, 3, 2)), dim = 0) 
+        self.u_init = torch.cat((u[1:self.Ns, :, :], torch.zeros(1, 3, 2, dtype = torch.double)), dim = 0) 
 
 
     def getCost(self, bool_eps): #cost is checked 
@@ -257,7 +256,7 @@ class ALIPtorch_mpc():
                                         [ 0, 0, self._pLx, 0, 0, 0],
                                         [ 0, 0, 0, self._pLy, 0, 0],
                                         [ 0, 0, 0, 0, self.eps, 0],
-                                        [ 0, 0, 0, 0, 0, self.eps]])
+                                        [ 0, 0, 0, 0, 0, self.eps]], dtype = torch.double)
 
         self.Qterminal = 100*self.Qrunning
         h = self.Qrunning.unsqueeze(0).unsqueeze(0).repeat(self.Ns-1, self.n_batch, 1, 1)
@@ -277,8 +276,8 @@ class ALIPtorch_mpc():
         q4 = self._pLy * (-2*self.Ly_des)
 
 
-        self.q_plus = torch.zeros(self.Ns, self.n_batch, self.n_state+self.n_ctrl)  #initial right stance /left swing
-        self.q_minus = torch.zeros(self.Ns, self.n_batch, self.n_state+self.n_ctrl) #initial left stance /right swing
+        self.q_plus = torch.zeros(self.Ns, self.n_batch, self.n_state+self.n_ctrl, dtype = torch.double)  #initial right stance /left swing
+        self.q_minus = torch.zeros(self.Ns, self.n_batch, self.n_state+self.n_ctrl, dtype = torch.double) #initial left stance /right swing
 
         self.q_plus[:,:,0] = self.q_minus[:,:,0] = q1
         self.q_plus[:,:,3] = self.q_minus[:,:,3] = q4
@@ -313,12 +312,12 @@ class ALIPtorch_mpc():
         self._A = torch.tensor([[0 ,0,0, 1/self.mass/self._zH],
                           [0,0,-1/self.mass/self._zH,0],
                           [0,-self.mass*self.g,0,0],
-                          [self.mass*self.g,0,0,0]])
+                          [self.mass*self.g,0,0,0]], dtype = torch.double)
 
         B = torch.tensor([[-1, 0],
                           [ 0,-1],
                           [ 0, 0],
-                          [ 0, 0]], dtype=torch.float32)
+                          [ 0, 0]], dtype=torch.double)
 
 
         exp_At = torch.linalg.matrix_exp(self._A*self.dt) 

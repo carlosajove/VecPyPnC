@@ -80,15 +80,11 @@ class BasicTask(Task):
                 self._data_saver.add(self._target_id + '_vel', vel_act.clone())
                 self._data_saver.add('w_' + self._target_id, self._w_hierarchy)
         elif self._task_type == "LINK_ORI":
-            mat_act = self._robot.get_link_iso(self._target_id)[:, 0:3, 0:3]
-            quat_act = orbit_util.convert_quat(orbit_util.quat_from_matrix(mat_act))
+            quat_act = orbit_util.convert_quat(orbit_util.quat_from_matrix(self._robot.get_link_iso(self._target_id)[:, 0:3, 0:3]))
             quat_act_temp_h = util.prevent_quat_jump_pytorch(self._pos_des,
                                                              quat_act)
-            mat_act = orbit_util.matrix_from_quat(orbit_util.convert_quat(quat_act_temp_h, to = "wxyz" ))
-            mat_des = orbit_util.matrix_from_quat(orbit_util.convert_quat(self._pos_des, to ="wxyz"))
-            mat_act = mat_act.to(mat_des.dtype)
-
-            quat_err = orbit_util.convert_quat(orbit_util.quat_from_matrix(torch.bmm(mat_des, mat_act.transpose(1,2))))
+                                                             
+            quat_err = util.quat_mul_xyzw(self._pos_des, util.quat_inv_xyzw(quat_act_temp_h))
 
             self._pos_err = util.quat_to_exp_pytorch(quat_err)
             vel_act = self._robot.get_link_vel(self._target_id)[:, 0:3]

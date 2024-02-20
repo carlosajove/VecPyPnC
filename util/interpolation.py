@@ -5,6 +5,8 @@ import torch
 import math
 
 from util import liegroup
+from util import orbit_util
+from util import util
 
 
 def smooth_changing(ini, end, dur, curr_time):
@@ -200,6 +202,78 @@ class HermiteCurveQuat(object):
 
         return self._omega_1 * self._bddot1 + self._omega_2 * self._bddot2 + self._omega_3 * self._bddot3
 
+
+
+
+class HermiteCurveQuat_torch_test(object):
+    #https://dl.acm.org/doi/pdf/10.1145/218380.218486
+    #quaternion formalism will be (w, x,, y, z)
+
+    def __init__(self, n_batch):
+        self._n_batch = n_batch
+        self._q0 = torch.zeros(n_batch, 4)
+        self._w1 = torch.zeros(n_batch, 4)
+        self._w2 = torch.zeros(n_batch, 3)
+        self._w3 = torch.zeros(n_batch, 3)
+
+        self._qa = torch.zeros(n_batch, 4)
+        self._qb = torch.zeros(n_batch, 4)
+        self._wa = torch.zeros(n_batch, 3)
+        self._wb = torch.zeros(n_batch, 3)
+    
+    def setParams(self, id, q_a, q_b, w_a, w_b): #id must be a list of indexes
+        self._qa[id] = q_a
+        self._qb[id] = q_b
+        self._wa[id] = w_a
+        self._wb[id] = w_b
+
+        self._q0 = self._qa
+        self._w1 = self._wa/3.
+        self._w3 = self._wb/3.
+        self._w2 = util.log_quat_map(orbit_util.quat_mul(
+                                     orbit_util.quat_mul(orbit_util.quat_inv(util.exp_quat_map(self._w1)),
+                                                         orbit_util.quat_inv(self._qa)),
+                                     orbit_util.quat_mul(self._qb,
+                                                         util.exp_quat_map(self._w3))))
+
+    def _compute_basis(self, s_in):
+        s = torch.clamp(s_in, 0., 1.).unsqueeze(1)
+
+        self._b1 = 1 - (1 - s)**3
+        self._b2 = 3 * s**2 - 2 * s**3
+        self._b3 = s**3
+        self._bdot1 = 3 * (1 - s)**2
+        self._bdot2 = 6 * s - 6 * s**2
+        self._bdot3 = 3 * s**2
+        self._bddot1 = -6 * (1 - s)
+        self._bddot2 = 6 - 12 * s
+        self._bddot3 = 6 * s
+
+    def evaluate(self, s_in):
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+        res = orbit_util.quat_mul(orbit_util.quat_mul(orbit_util.quat_mul(
+                                        self._q0, 
+                                        util.exp_quat_map(self._w1 * self._b1)),
+                                        util.exp_quat_map(self._w2 * self._b2)),
+                                        util.exp_quat_map(self._w3 * self._b3))
+        return res
+
+    def evaluate_ang_vel(self, s_in):
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+
+        return self._w1 * self._bdot1 + self._w2 * self._bdot2 + self._w3* self._bdot3
+    
+    def evaluate_ang_acc(self, s_in):
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+
+        return self._w1 * self._bddot1 + self._w2 * self._bddot2 + self._w3* self._bddot3
+
+
+
+    
 """TODO: maybe finish implementation
          need to find efficient way of doing the if 
 class AlipSwing(object):

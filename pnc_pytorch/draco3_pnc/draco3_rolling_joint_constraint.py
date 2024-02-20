@@ -12,7 +12,7 @@ class Draco3RollingJointConstraint(InternalConstraint):
         self._jacobian[:, 0, l_jd_idx] = -1.
         self._jacobian[:, 1, r_jp_idx] = 1.
         self._jacobian[:, 1, r_jd_idx] = -1.
-        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, 2)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, 2, dtype=torch.double)
 
     def _update_jacobian(self):
         # Constant jacobian
