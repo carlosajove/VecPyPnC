@@ -132,7 +132,6 @@ def forward(Q, p, G, h, A, b, Q_LU, S_LU, R, eps=1e-12, verbose=0, notImprovedLi
 
         if verbose == 1:
             #CARLOS
-            print("hey")
             print('iter: {}, pri_resid: {:.5e}, dual_resid: {:.5e}, mu: {:.5e}'.format(
                 i, pri_resid.mean(), dual_resid.mean(), mu.mean()))
         if best['resids'] is None:

@@ -33,18 +33,25 @@ def smooth_changing_acc(ini, end, dur, curr_time):
     return ret
 
 def smooth_changing_pytorch(ini, end, dur, curr_time):
+    if (ini.dim() > 1):
+        curr_time = curr_time.unsqueeze(1)
+
     ret = ini + (end - ini) * 0.5 * (1 - torch.cos(curr_time / dur * math.pi))
     ret = torch.where(curr_time > dur, end, ret)
     return ret
 
 
 def smooth_changing_vel_pytorch(ini, end, dur, curr_time):
+    if (ini.dim() > 1):
+        curr_time = curr_time.unsqueeze(1)
     ret = (end - ini) * 0.5 * (math.pi / dur) * torch.sin(curr_time / dur * math.pi)
     ret = torch.where(curr_time > dur, end, ret)
     return ret
 
 
 def smooth_changing_acc_pytorch(ini, end, dur, curr_time):
+    if (ini.dim() > 1):
+        curr_time = curr_time.unsqueeze(1)
     ret = (end - ini) * 0.5 * (math.pi / dur) * (
         math.pi / dur) * torch.cos(curr_time / dur * torch.pi)
     ret = torch.where(curr_time > dur, end, ret)
@@ -262,7 +269,7 @@ class HermiteCurveQuat_torch_test(object):
                                         util.exp_quat_map(self._w2 * self._b2)),
                                         util.exp_quat_map(self._w3 * self._b3))
         return res
-
+    #TODO: check if makes sense, ang vel and ang acc
     def evaluate_ang_vel(self, s_in):
         s_in = s_in/self._duration
         s = torch.clamp(s_in, 0., 1.)

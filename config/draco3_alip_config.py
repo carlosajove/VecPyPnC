@@ -28,7 +28,7 @@ class PnCConfig(object):
 
 
 class WBCConfig(object):
-    VERBOSE = True
+    VERBOSE = False
 
     # Max normal force per contact
     RF_Z_MAX = 1000.0
@@ -90,7 +90,7 @@ class WalkingState(object):
     ALIP = 19
 
 class AlipParams(object):
-    N_BATCH = 3
+    N_BATCH = 100
     TS = 0.25
     NT = 4
     NS = 10
@@ -102,10 +102,10 @@ class AlipParams(object):
     UFP_Y_MAX = 0.4
     UFP_Y_MIN = 0.08
     LX_OFFSET = 0.
-    LY_DES = 1.
+    LY_DES = 0.
+    COM_YAW = 0.
     INITIAL_STANCE_LEG = -1
     SWING_HEIGHT = 0.05
-    COM_YAW = 1.
 
     PX = 1.
     PY = 1.

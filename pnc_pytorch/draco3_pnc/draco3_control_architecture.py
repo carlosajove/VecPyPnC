@@ -109,10 +109,10 @@ class Draco3ControlArchitecture(ControlArchitecture):
         self._sp = Draco3StateProvider()
 
         self._alip_iter = 0
-        self._new_step_list = 3*torch.ones(self._n_batch) # each get_command substracts 1
-                                                          # switch_leg set ids to 3 --> tunable parameter
-                                                          # new step is computed for ids == 0
-                                                          # one step for ids <= 0
+        self._new_step_list = torch.ones(self._n_batch) # each get_command substracts 1
+                                                        # switch_leg set ids to 3 --> tunable parameter
+                                                        # new step is computed for ids == 0
+                                                        # one step for ids <= 0
                                                         
 
 
@@ -126,7 +126,6 @@ class Draco3ControlArchitecture(ControlArchitecture):
         if(self._state == WalkingState.ALIP):
             # Update State Machine
             self._new_step_list -= 1
-            print(self._new_step_list)
             ids_new_step = torch.nonzero(self._new_step_list == 0).squeeze().tolist()
             ids_one_step = torch.nonzero(self._new_step_list <= 0).squeeze().tolist()
             if (len(ids_new_step) > 0):

@@ -133,7 +133,7 @@ class ALIPtorch_mpc():
                            pos, vel, lfoot_pos, rfoot_pos):
         self._batch = pos.shape[0]
 
-        stleg_pos = torch.where(stance_leg == 1, rfoot_pos, lfoot_pos)
+        stleg_pos = torch.where(stance_leg.unsqueeze(1) == 1, rfoot_pos, lfoot_pos)
 
         #stleg_pos = stleg_pos.to(torso_ori.dtype)
         pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), pos.unsqueeze(2)).squeeze()
@@ -143,7 +143,7 @@ class ALIPtorch_mpc():
         x = pos_torso_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
 
         if self._b_data_save:
-            swfoot_pos = torch.where(stance_leg == 1, lfoot_pos, rfoot_pos)
+            swfoot_pos = torch.where(stance_leg.unsqueeze(1) == 1, lfoot_pos, rfoot_pos)
             swfoot_pos_ori = torch.matmul(torso_ori.transpose(1,2), swfoot_pos.unsqueeze(2)).squeeze()
             swf_pos = swfoot_pos_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
             self._data_saver.add('mpc_sw_foot_pos', swf_pos)
@@ -218,7 +218,7 @@ class ALIPtorch_mpc():
         Problem: last column is not inside the bounds, if doesn't work try  u[0, :, :].unsqueeze(0) instead
         """
         #self.u_init = u #u[mpcT, nbatch, 2]
-        self.u_init = torch.cat((u[1:self._Ns, :, :], torch.zeros(1, 3, 2, dtype = torch.double)), dim = 0) 
+        self.u_init = torch.cat((u[1:self._Ns, :, :], torch.zeros(1, self._batch, 2, dtype = torch.double)), dim = 0) 
 
 
     def getCost(self, bool_eps, idp, idm): #cost is checked 

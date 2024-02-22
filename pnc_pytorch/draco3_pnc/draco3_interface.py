@@ -8,6 +8,7 @@ import copy
 import pybullet as p
 
 from config.draco3_alip_config import PnCConfig
+from config.draco3_alip_config import AlipParams
 from pnc_pytorch.interface import Interface
 from pnc_pytorch.draco3_pnc.draco3_interrupt_logic import Draco3InterruptLogic
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
@@ -19,7 +20,7 @@ from pnc_pytorch.data_saver import DataSaver
 class Draco3Interface(Interface):
     def __init__(self):
         super(Draco3Interface, self).__init__()
-        self._n_batch = 3
+        self._n_batch = AlipParams.N_BATCH
         if PnCConfig.DYN_LIB == "dart":
             from pnc_pytorch.robot_system.dart_robot_system import DartRobotSystem
             self._robot = DartRobotSystem(

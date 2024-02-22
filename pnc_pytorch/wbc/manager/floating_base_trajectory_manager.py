@@ -19,7 +19,7 @@ class FloatingBaseTrajectoryManager(object):
         self._start_time = torch.zeros(self._n_batch, dtype = torch.double)
         self._duration = torch.zeros(self._n_batch, dtype = torch.double)
         self._ini_com_pos, self._target_com_pos = torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double)
-        self._ini_base_quat, self._target_base_quat = torch.zeros(4, dtype = torch.double), torch.zeros(4, dtype = torch.double)
+        self._ini_base_quat, self._target_base_quat = torch.zeros(self._n_batch, 4, dtype = torch.double), torch.zeros(self._n_batch, 4, dtype = torch.double)
 
         self._b_swaying = False
 
@@ -60,16 +60,15 @@ class FloatingBaseTrajectoryManager(object):
 
     def update_floating_base_desired(self, current_time):
         com_pos_des, com_vel_des, com_acc_des = torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double)
-        for i in range(3):
-            com_pos_des[i] = interpolation.smooth_changing_pytorch(
-                self._ini_com_pos[i], self._target_com_pos[i],
-                self._duration, current_time - self._start_time)
-            com_vel_des[i] = interpolation.smooth_changing_vel_pytorch(
-                self._ini_com_pos[i], self._target_com_pos[i],
-                self._duration, current_time - self._start_time)
-            com_acc_des[i] = interpolation.smooth_changing_acc_pytorch(
-                self._ini_com_pos[i], self._target_com_pos[i],
-                self._duration, current_time - self._start_time)
+        com_pos_des = interpolation.smooth_changing_pytorch(
+            self._ini_com_pos, self._target_com_pos,
+            self._duration, current_time - self._start_time)
+        com_vel_des = interpolation.smooth_changing_vel_pytorch(
+            self._ini_com_pos, self._target_com_pos,
+            self._duration, current_time - self._start_time)
+        com_acc_des = interpolation.smooth_changing_acc_pytorch(
+            self._ini_com_pos, self._target_com_pos,
+            self._duration, current_time - self._start_time)
 
         self._com_task.update_desired(com_pos_des, 
                                       com_vel_des, 
@@ -88,7 +87,7 @@ class FloatingBaseTrajectoryManager(object):
         scaled_t = scaled_t
         scaled_tddot = scaled_tddot
         scaled_tdot = scaled_tdot
-        exp_inc = self._exp_error * scaled_t
+        exp_inc = self._exp_error * scaled_t.unsqueeze(1)
         quat_inc = util.exp_to_quat_pytorch(exp_inc)
 
         # TODO (Check this again)
@@ -99,7 +98,7 @@ class FloatingBaseTrajectoryManager(object):
 
         base_quat_des = util.quat_mul_xyzw(self._ini_base_quat, quat_inc)
             
-        base_angvel_des = self._exp_error * scaled_tdot
-        base_angacc_des = self._exp_error * scaled_tddot
+        base_angvel_des = self._exp_error * scaled_tdot.unsqueeze(1)
+        base_angacc_des = self._exp_error * scaled_tddot.unsqueeze(1)
 
         self._base_ori_task.update_desired(base_quat_des, base_angvel_des, base_angacc_des)

@@ -84,9 +84,10 @@ def quat_to_exp_pytorch(quat):
                 img_vec[:, 2] * img_vec[:, 2]))
 
     #ret = torch.zeros_like(img_vec)
-    ret = torch.where(torch.abs(theta) < 1e-4, torch.zeros(3), img_vec / torch.sin(theta / 2.0))
+    ret = torch.where(torch.abs(theta).unsqueeze(1) < 1e-4, torch.zeros(batch, 3, dtype = torch.double), 
+                                                            img_vec / torch.sin(theta / 2.0).unsqueeze(1))
 
-    return torch.clone(ret * theta)
+    return torch.clone(ret * theta.unsqueeze(1))
 
 
 def exp_to_quat(exp):
@@ -336,7 +337,6 @@ def rotationZ(theta, inMatrix):
     """
     theta input is in degrees
     """
-    print("hey")
     assert len(inMatrix.shape) == 3
     theta_radians = torch.deg2rad(theta)
     cos_theta = torch.cos(theta_radians)
