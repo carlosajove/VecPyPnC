@@ -211,21 +211,24 @@ class HermiteCurveQuat_torch_test(object):
 
     def __init__(self, n_batch):
         self._n_batch = n_batch
-        self._q0 = torch.zeros(n_batch, 4)
-        self._w1 = torch.zeros(n_batch, 4)
-        self._w2 = torch.zeros(n_batch, 3)
-        self._w3 = torch.zeros(n_batch, 3)
+        self._q0 = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._w1 = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._w2 = torch.zeros(n_batch, 3, dtype = torch.double)
+        self._w3 = torch.zeros(n_batch, 3, dtype = torch.double)
 
-        self._qa = torch.zeros(n_batch, 4)
-        self._qb = torch.zeros(n_batch, 4)
-        self._wa = torch.zeros(n_batch, 3)
-        self._wb = torch.zeros(n_batch, 3)
+        self._qa = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._qb = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._wa = torch.zeros(n_batch, 3, dtype = torch.double)
+        self._wb = torch.zeros(n_batch, 3, dtype = torch.double)
+
+        self._duration = torch.ones(n_batch, dtype = torch.double)
     
-    def setParams(self, id, q_a, q_b, w_a, w_b): #id must be a list of indexes
+    def setParams(self, id, q_a, q_b, w_a, w_b, duration): #id must be a list of indexes
         self._qa[id] = q_a
         self._qb[id] = q_b
         self._wa[id] = w_a
         self._wb[id] = w_b
+        self._duration[id] = duration
 
         self._q0 = self._qa
         self._w1 = self._wa/3.
@@ -250,6 +253,7 @@ class HermiteCurveQuat_torch_test(object):
         self._bddot3 = 6 * s
 
     def evaluate(self, s_in):
+        s_in = s_in/self._duration
         s = torch.clamp(s_in, 0., 1.)
         self._compute_basis(s)
         res = orbit_util.quat_mul(orbit_util.quat_mul(orbit_util.quat_mul(
@@ -260,12 +264,14 @@ class HermiteCurveQuat_torch_test(object):
         return res
 
     def evaluate_ang_vel(self, s_in):
+        s_in = s_in/self._duration
         s = torch.clamp(s_in, 0., 1.)
         self._compute_basis(s)
 
         return self._w1 * self._bdot1 + self._w2 * self._bdot2 + self._w3* self._bdot3
     
     def evaluate_ang_acc(self, s_in):
+        s_in = s_in/self._duration
         s = torch.clamp(s_in, 0., 1.)
         self._compute_basis(s)
 
@@ -310,17 +316,24 @@ class AlipSwing(object):
 """
 
 class AlipSwing2(object): # input is batched
-    def __init__(self, start_pos, end_pos, mid_z_pos, duration):
-        self._start_pos = start_pos.clone().detach()
-        self._end_pos = end_pos.clone().detach()
-        self._mid_z_pos = mid_z_pos.clone().detach()
-        self._duration = duration.clone().detach()
-        self.n_batch = self._start_pos.shape[0]
+    def __init__(self, n_batch):
+        self._n_batch = n_batch
+        self._start_pos = torch.zeros(self._n_batch, 3, dtype = torch.double)
+        self._end_pos = torch.zeros(self._n_batch, 3, dtype = torch.double)
+        self._mid_z_pos = torch.zeros(self._n_batch, dtype = torch.double)
+        self._duration = torch.zeros(self._n_batch, dtype = torch.double)
 
-        self.z_curve = QuadraticLagrangePol(start_pos[: , 2], torch.zeros(self.n_batch), 
-                                            self._mid_z_pos , self._duration/2,
-                                            self._end_pos[:, 2], self._duration)
+        self.z_curve = QuadraticLagrangePol(self._n_batch)
     
+    def setParams(self, ids, start_pos, end_pos, mid_z_pos, duration):
+        assert len(ids) > 0
+        self._start_pos[ids] = start_pos.clone().detach()
+        self._end_pos[ids] = end_pos.clone().detach()
+        self._mid_z_pos[ids] = mid_z_pos.clone().detach()
+        self._duration[ids] = duration.clone().detach()
+
+        self.z_curve.setParams(ids, start_pos[:, 2], torch.zeros(len(ids), dtype = torch.double), mid_z_pos, duration/2, end_pos[:,2], duration)
+
     def evaluate(self, t):
         _t = torch.min(t, self._duration)  
 
@@ -364,17 +377,28 @@ class AlipSwing2(object): # input is batched
 
 
 class QuadraticLagrangePol(object): #sizes are torhc.tensor([n_batch])
-    def __init__(self, z0, t0, z1, t1, z2, t2):
-        self._z0 = z0.clone()
-        self._z1 = z1.clone()
-        self._z2 = z2.clone()
-        self._t0 = t0.clone()
-        self._t1 = t1.clone()
-        self._t2 = t2.clone()
+    def __init__(self, n_batch):
+        self._n_batch = n_batch
+        self._z0 = torch.zeros(self._n_batch, dtype = torch.double)
+        self._z1 = torch.zeros(self._n_batch, dtype = torch.double)
+        self._z2 = torch.zeros(self._n_batch, dtype = torch.double)
+        self._t0 = torch.zeros(self._n_batch, dtype = torch.double)
+        self._t1 = torch.zeros(self._n_batch, dtype = torch.double)
+        self._t2 = torch.zeros(self._n_batch, dtype = torch.double)
+
+
+
+    def setParams(self, ids, z0, t0, z1, t1, z2, t2):
+        self._z0[ids] = z0.clone()
+        self._z1[ids] = z1.clone()
+        self._z2[ids] = z2.clone()
+        self._t0[ids] = t0.clone()
+        self._t1[ids] = t1.clone()
+        self._t2[ids] = t2.clone() 
 
         self._c0 = self._z0/((self._t0 - self._t1)*(self._t0 - self._t2))
         self._c1 = self._z1/((self._t1 - self._t0)*(self._t1 - self._t2))
-        self._c2 = self._z2/((self._t2 - self._t0)*(self._t2 - self._t1))
+        self._c2 = self._z2/((self._t2 - self._t0)*(self._t2 - self._t1))       
 
     def evaluate(self, t):
         output = (t - self._t1)*(t - self._t2)*self._c0 + \
@@ -391,20 +415,3 @@ class QuadraticLagrangePol(object): #sizes are torhc.tensor([n_batch])
     def evaluate_second_derivative(self, t):
         return 2*(self._c0 + self._c1 + self._c2)
 
-#TODO: erase and do hermite
-class LinearQuatCurve():
-    def __init__(self, start_quat, end_quat, duration):
-        self._st_quat = start_quat
-        self._end_quat = end_quat
-        self._duration = duration
-        self._diff = (self._end_quat - self._st_quat)/self._duration.unsqueeze(1)
-
-    def evaluate(self, t):
-        return self._diff * t.unsqueeze(1) + self._st_quat
-
-    def evaluate_first_derivative(self, t):
-        #return self._diff
-        return torch.zeros(self._st_quat.shape[0], 3)
-
-    def evaluate_second_derivative(self, t):
-        return torch.zeros(self._st_quat.shape[0], 3)

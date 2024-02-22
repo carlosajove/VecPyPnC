@@ -11,7 +11,7 @@ class SimConfig(object):
     INITIAL_QUAT_WORLD_TO_BASEJOINT = [0., 0., 0., 1.]
 
     PRINT_TIME = False
-    PRINT_ROBOT_INFO = True
+    PRINT_ROBOT_INFO = False
     VIDEO_RECORD = False
     RECORD_FREQ = 1
     SIMULATE_CAMERA = False
@@ -102,10 +102,10 @@ class AlipParams(object):
     UFP_Y_MAX = 0.4
     UFP_Y_MIN = 0.08
     LX_OFFSET = 0.
-    LY_DES = -2.
+    LY_DES = 1.
     INITIAL_STANCE_LEG = -1
     SWING_HEIGHT = 0.05
-    COM_YAW = 8.
+    COM_YAW = 1.
 
     PX = 1.
     PY = 1.
@@ -116,7 +116,7 @@ class AlipParams(object):
     """
     COM
     """
-    UCOM_X_MAX = 0.4
+    UCOM_X_MAX = 0.3
     UCOM_Y_EXT = 0.3
     UCOM_Y_INT = 0.1
 

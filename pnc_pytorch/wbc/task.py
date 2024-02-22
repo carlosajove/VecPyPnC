@@ -14,20 +14,20 @@ class Task(abc.ABC):
         self._dim = dim
         self.n_batch = n_batch
 
-        self._w_hierarchy = torch.ones(self.n_batch)
+        self._w_hierarchy = torch.ones(self.n_batch, dtype = torch.double)
 
-        self._kp = torch.zeros(self._dim)  #kp and kd will be the same fro all robots
-        self._kd = torch.zeros(self._dim)  #since they don't change during sim, can change this eventually
+        self._kp = torch.zeros(self._dim, dtype = torch.double)  #kp and kd will be the same fro all robots
+        self._kd = torch.zeros(self._dim, dtype = torch.double)  #since they don't change during sim, can change this eventually
 
-        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot)
-        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim)
+        self._jacobian = torch.zeros(self.n_batch, self._dim, self._robot.n_q_dot, dtype = torch.double)
+        self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
 
-        self._op_cmd = torch.zeros(self.n_batch, self._dim)
-        self._pos_err = torch.zeros(self.n_batch, self._dim)
+        self._op_cmd = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
+        self._pos_err = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
 
-        self._pos_des = torch.zeros(self.n_batch, self._dim)
-        self._vel_des = torch.zeros(self.n_batch, self._dim)
-        self._acc_des = torch.zeros(self.n_batch, self._dim)
+        self._pos_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
+        self._vel_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
+        self._acc_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
 
     @property
     def op_cmd(self):
@@ -83,7 +83,7 @@ class Task(abc.ABC):
     def w_hierarchy(self, batched_value):
         self._w_hierarchy = batched_value
 
-    def update_desired(self, pos_des, vel_des, acc_des):
+    def update_desired(self, pos_des, vel_des, acc_des, ids = None):
         """
         Update pos_des, vel_des, acc_des which will be used later to compute
         op_cmd
@@ -100,9 +100,15 @@ class Task(abc.ABC):
         """
         assert vel_des.shape[1] == self._dim
         assert acc_des.shape[1] == self._dim
-        self._pos_des = pos_des
-        self._vel_des = vel_des
-        self._acc_des = acc_des
+        if ids is None:
+            self._pos_des = pos_des
+            self._vel_des = vel_des
+            self._acc_des = acc_des
+        else:
+            self._pos_des[ids] = pos_des
+            self._vel_des[ids] = vel_des
+            self._acc_des[ids] = acc_des
+            
 
     @abc.abstractmethod
     def update_cmd(self):

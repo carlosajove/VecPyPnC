@@ -16,13 +16,10 @@ class FloatingBaseTrajectoryManager(object):
         self._base_ori_task = base_ori_task
         self._robot = robot
 
-        self._start_time = torch.zeros(self._n_batch)
-        self._duration = torch.zeros(self._n_batch)
-        self._ini_com_pos, self._target_com_pos = torch.zeros(self._n_batch, 3), torch.zeros(self._n_batch, 3)
-        self._ini_base_quat, self._target_base_quat = np.zeros(4), np.zeros(4)
-
-        self._amp = np.zeros(3)
-        self._freq = np.zeros(3)
+        self._start_time = torch.zeros(self._n_batch, dtype = torch.double)
+        self._duration = torch.zeros(self._n_batch, dtype = torch.double)
+        self._ini_com_pos, self._target_com_pos = torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double)
+        self._ini_base_quat, self._target_base_quat = torch.zeros(4, dtype = torch.double), torch.zeros(4, dtype = torch.double)
 
         self._b_swaying = False
 
@@ -62,8 +59,7 @@ class FloatingBaseTrajectoryManager(object):
         """
 
     def update_floating_base_desired(self, current_time):
-        com_pos_des, com_vel_des, com_acc_des = torch.zeros(self._n_batch, 3), torch.zeros(self._n_batch, 3), torch.zeros(self._n_batch, 3)
-
+        com_pos_des, com_vel_des, com_acc_des = torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double), torch.zeros(self._n_batch, 3, dtype = torch.double)
         for i in range(3):
             com_pos_des[i] = interpolation.smooth_changing_pytorch(
                 self._ini_com_pos[i], self._target_com_pos[i],
@@ -80,11 +76,14 @@ class FloatingBaseTrajectoryManager(object):
                                       com_acc_des)
 
         scaled_t = interpolation.smooth_changing_pytorch(
-            torch.zeros(self._n_batch), torch.ones(self._n_batch), self._duration, current_time - self._start_time)
+            torch.zeros(self._n_batch, dtype = torch.double), torch.ones(self._n_batch, dtype = torch.double), 
+            self._duration, current_time - self._start_time)
         scaled_tdot = interpolation.smooth_changing_vel_pytorch(
-            torch.zeros(self._n_batch), torch.ones(self._n_batch), self._duration, current_time - self._start_time)
+            torch.zeros(self._n_batch, dtype = torch.double), torch.ones(self._n_batch, dtype = torch.double), 
+            self._duration, current_time - self._start_time)
         scaled_tddot = interpolation.smooth_changing_acc_pytorch(
-            torch.zeros(self._n_batch), torch.ones(self._n_batch), self._duration, current_time - self._start_time)
+            torch.zeros(self._n_batch, dtype = torch.double), torch.ones(self._n_batch, dtype = torch.double), 
+            self._duration, current_time - self._start_time)
 
         scaled_t = scaled_t
         scaled_tddot = scaled_tddot

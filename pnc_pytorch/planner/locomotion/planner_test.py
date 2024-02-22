@@ -3,7 +3,7 @@ import math
 
 import matplotlib as plt
 
-from pnc_pytorch.planner.locomotion.alip_mpc import ALIPtorch_mpc
+from pnc_pytorch.planner.locomotion.alip_mpc_old import ALIPtorch_mpc
 from config.draco3_alip_config import AlipParams
 
 def get_frame(AlipMpc, state):
