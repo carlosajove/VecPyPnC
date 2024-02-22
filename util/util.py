@@ -336,6 +336,7 @@ def rotationZ(theta, inMatrix):
     """
     theta input is in degrees
     """
+    print("hey")
     assert len(inMatrix.shape) == 3
     theta_radians = torch.deg2rad(theta)
     cos_theta = torch.cos(theta_radians)

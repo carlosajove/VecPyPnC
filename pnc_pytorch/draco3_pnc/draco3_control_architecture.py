@@ -8,13 +8,8 @@ from pnc_pytorch.draco3_pnc.draco3_controller import Draco3Controller
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
-
-
-
-
 from pnc_pytorch.planner.locomotion.alip_mpc import ALIPtorch_mpc
-from pnc_pytorch.planner.locomotion.alip_mpc_com import ALIPcomtorch_mpc
-from pnc_pytorch.planner.locomotion.alip_mpc_mixed import ALIPmixedtorch_mpc
+
 
 from pnc_pytorch.wbc.manager.ALIP_trajectory_manager import ALIPtrajectoryManager
 from pnc_pytorch.wbc.manager.floating_base_trajectory_manager import FloatingBaseTrajectoryManager
@@ -41,9 +36,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # ======================================================================
         # Initialize Planner
         # ======================================================================
-        self._alip_mpc = ALIPtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
-        self._alip_com_mpc = ALIPcomtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
-        self._alip_mixed_mpc = ALIPmixedtorch_mpc(robot, self._n_batch, PnCConfig.SAVE_DATA)
+        self._alip_mpc = ALIPtorch_mpc(robot, PnCConfig.SAVE_DATA)
         # ======================================================================
         # Initialize Task Manager
         # ======================================================================
@@ -116,26 +109,39 @@ class Draco3ControlArchitecture(ControlArchitecture):
         self._sp = Draco3StateProvider()
 
         self._alip_iter = 0
+        self._new_step_list = 3*torch.ones(self._n_batch) # each get_command substracts 1
+                                                          # switch_leg set ids to 3 --> tunable parameter
+                                                          # new step is computed for ids == 0
+                                                          # one step for ids <= 0
+                                                        
+
+
 
     def get_command(self):
+        #ASSUMES ALL THE SIMULATIONS START WITH ALIP AT THE SAME TIME
+        #THERE ARE NO ERRORS BEFORE WALKING STATE ALIP
         if self._b_state_first_visit:
             self._state_machine[self._state].first_visit()
             self._b_state_first_visit = False
         if(self._state == WalkingState.ALIP):
             # Update State Machine
-            if(self._alip_iter >= 0):
-                if (self._alip_iter == 0):
-                    self._state_machine[self._state].new_step()
-                self._state_machine[self._state].one_step()
+            self._new_step_list -= 1
+            print(self._new_step_list)
+            ids_new_step = torch.nonzero(self._new_step_list == 0).squeeze().tolist()
+            ids_one_step = torch.nonzero(self._new_step_list <= 0).squeeze().tolist()
+            if (len(ids_new_step) > 0):
+                self._state_machine[self._state].new_step(ids_new_step)
+            if (len(ids_one_step) > 0):
+                self._state_machine[self._state].one_step(ids_one_step)
 
             # Update State Machine Independent Trajectories
             self._upper_body_tm.use_nominal_upper_body_joint_pos(
                 self._sp.nominal_joint_pos)
             # Get Whole Body Control Commands
             command = self._draco3_controller.get_command()
-            self._alip_iter += 1
-            if (self._state_machine[self._state].switchLeg()):
-                self._alip_iter = -3
+            self._new_step_list = self._state_machine[self._state].switchLeg(self._new_step_list)
+            #self._state_machine[self._state]
+        
         else: 
              # Update State Machine
             self._state_machine[self._state].one_step()
