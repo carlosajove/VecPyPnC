@@ -46,13 +46,11 @@ class AlipLocomotion(StateMachine):
 
 
     def new_step(self, ids):
-        print(ids)
         self._trajectory_manager.stance_leg(self._stance_leg[ids], ids)
         self._state_machine_start_time[ids] = self._sp.curr_time * torch.ones(len(ids), dtype = torch.double)
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
 
         self._Tr = self._Ts - self._state_machine_time
-        print("setter")
         self._trajectory_manager.des_com_yaw(self._des_com_yaw[ids], ids)
 
         self._trajectory_manager.setNewOri(ids) #TODO: TRAJECTORY FOR ORI
@@ -101,35 +99,32 @@ class AlipLocomotion(StateMachine):
         self._trajectory_manager.updateDesired(t, ids)
 
     def switchLeg(self, new_step_list):
-        print("Switch", self._sp.curr_time, self._sp.curr_time - self._state_machine_start_time)
         indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)
         rfoot_z = self._robot.get_link_iso("r_foot_contact")[:, 2, 3]
         lfoot_z = self._robot.get_link_iso("l_foot_contact")[:, 2, 3]
-        rfoot_rf_max = self._tci_container.contact_list[0].rf_z_max
-        lfoot_rf_max = self._tci_container.contact_list[1].rf_z_max
 
+
+        swing_leg_height = torch.where(self._stance_leg == 1, lfoot_z, rfoot_z)
+        cond1 = torch.where(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts, True, False)
+        cond2 = torch.where(swing_leg_height < 0.0005, True, False)#* torch.ones(self._n_batch, dtype = torch.double)
+        cond = torch.logical_and(cond1, cond2)
+        indices = torch.nonzero(cond).squeeze().tolist()
         #res = torch.zeros(self._n_batch)
-        for i in indices:
-            if self._stance_leg[i] == 1 and lfoot_z[i] < 0.0005:
-                self._stance_leg[i] = -1
-                lfoot_rf_max[i] = AlipParams.RF_Z_MAX
-                self._state_machine_start_time = self._sp.curr_time
-                print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                new_step_list[i] = 3
-                if self._b_data_save:
-                    self._data_saver.add('leg_switch_time', self._sp.curr_time)
 
-            elif self._stance_leg[i] == -1 and rfoot_z[i] < 0.0005:
-                self._stance_leg[i] = 1
-                rfoot_rf_max[i] = AlipParams.RF_Z_MAX
-                self._state_machine_start_time = self._sp.curr_time
-                print("\n ---------------- \n", "Switch_leg ", i, "\n -------------------- \n")
-                new_step_list[i] == 3
-                if self._b_data_save:
-                    self._data_saver.add('leg_switch_time', self._sp.curr_time)
-        print(self._stance_leg)
-        self._tci_container.contact_list[0].rf_z_max = rfoot_rf_max
-        self._tci_container.contact_list[1].rf_z_max = lfoot_rf_max
+        if (len(indices) > 0):
+            self._stance_leg[indices] = self._stance_leg[indices]*-1
+            new_step_list[indices] = 3
+            self._state_machine_start_time[indices] = self._sp.curr_time * torch.ones(len(indices), dtype = torch.double)
+
+            rfoot_rf_max = self._tci_container.contact_list[0].rf_z_max
+            lfoot_rf_max = self._tci_container.contact_list[1].rf_z_max
+            lfoot_rf_max[indices] = self._rf_z_MAX[indices]
+            rfoot_rf_max[indices] = self._rf_z_MAX[indices]
+            self._tci_container.contact_list[0].rf_z_max = rfoot_rf_max
+            self._tci_container.contact_list[1].rf_z_max = lfoot_rf_max
+            if self._b_data_save:
+                self._data_saver.add('leg_switch_time', (indices, self._sp.curr_time))
+
         return new_step_list
 
 

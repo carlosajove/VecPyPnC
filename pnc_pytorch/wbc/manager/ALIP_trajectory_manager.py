@@ -50,6 +50,7 @@ class ALIPtrajectoryManager(object):
 
         #indata variables mpc frame of refrence (stance foot frame of ref)
         self._stance_leg = AlipParams.INITIAL_STANCE_LEG * torch.ones(self._n_batch)
+        self._stance_leg[-1] = self._stance_leg[-1]*-1
         self.Ts = AlipParams.TS
 
         #time vars
@@ -132,10 +133,10 @@ class ALIPtrajectoryManager(object):
 
         qbswing = orbit_util.convert_quat(self.des_ori_lfoot[ids], to = "wxyz")
         qbstorso = orbit_util.quat_from_matrix(self._des_torso_rot[ids])
-        self.hermite_quat_torso.setParams(ids, ori_torso_quat, qbstorso, torch.zeros(3, len(ids), dtype = torch.double),
-                                                                         torch.zeros(3, len(ids), dtype = torch.double), tr_)
-        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, qbswing, torch.zeros(3, len(ids), dtype = torch.double),
-                                                                      torch.zeros(3, len(ids), dtype = torch.double), tr_)
+        self.hermite_quat_torso.setParams(ids, ori_torso_quat, qbstorso, torch.zeros(len(ids), 3, dtype = torch.double),
+                                                                         torch.zeros(len(ids), 3, dtype = torch.double), tr_)
+        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, qbswing, torch.zeros(len(ids), 3, dtype = torch.double),
+                                                                      torch.zeros(len(ids), 3, dtype = torch.double), tr_)
 
 
 
