@@ -34,9 +34,9 @@ class WBCConfig(object):
     RF_Z_MAX = 1000.0
 
     # Task Hierarchy Weights
-    W_COM = 80.0
+    W_COM = 100.0
     W_TORSO = 60.0
-    W_UPPER_BODY = 20.0
+    W_UPPER_BODY = 40.0
     W_CONTACT_FOOT = 60.0
     W_SWING_FOOT = 80.0
 
@@ -90,15 +90,16 @@ class WalkingState(object):
     ALIP = 19
 
 class AlipParams(object):
-    N_BATCH = 100
-    TS = 0.25
-    NT = 4
-    NS = 10
-    MASS = 39.1
+    N_BATCH = 5
+    TS = 0.2
+    NT_qp = 4
+    NT_mpc = 1
+    NS = 4
+    MASS = 35.
     ZH = 0.69
-    WIDTH = 0.25
+    WIDTH = 0.15
     G = 9.81
-    UFP_X_MAX = 0.6
+    UFP_X_MAX = 0.5
     UFP_Y_MAX = 0.4
     UFP_Y_MIN = 0.08
     LX_OFFSET = 0.
@@ -109,8 +110,8 @@ class AlipParams(object):
 
     PX = 1.
     PY = 1.
-    PLX = 20.
-    PLY = 20.
+    PLX = 1.
+    PLY = 1.
     PBOUND = 5.
 
     """

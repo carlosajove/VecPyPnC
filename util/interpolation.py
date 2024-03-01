@@ -329,7 +329,7 @@ class AlipSwing2(object): # input is batched
         self._end_pos = torch.zeros(self._n_batch, 3, dtype = torch.double)
         self._mid_z_pos = torch.zeros(self._n_batch, dtype = torch.double)
         self._duration = torch.zeros(self._n_batch, dtype = torch.double)
-
+        self._st_time = torch.zeros(self._n_batch, dtype = torch.double)
         self.z_curve = QuadraticLagrangePol(self._n_batch)
     
     def setParams(self, ids, start_pos, end_pos, mid_z_pos, duration):
@@ -342,7 +342,7 @@ class AlipSwing2(object): # input is batched
         self.z_curve.setParams(ids, start_pos[:, 2], torch.zeros(len(ids), dtype = torch.double), mid_z_pos, duration/2, end_pos[:,2], duration)
 
     def evaluate(self, t):
-        _t = torch.min(t, self._duration)  
+        _t = torch.clamp(t, self._st_time, self._duration)  
 
         s = _t/self._duration
         #if s > 1 return end pos
@@ -357,7 +357,7 @@ class AlipSwing2(object): # input is batched
         return torch.stack((x,y,z), dim = 1)
     
     def evaluate_first_derivative(self, t):
-        _t = torch.min(t, self._duration)  
+        _t = torch.clamp(t, self._st_time, self._duration)  
         s = _t/self._duration
         #if s > 1 return end pos
 
@@ -369,15 +369,18 @@ class AlipSwing2(object): # input is batched
         return torch.stack((x, y, z), dim = 1)
     
     def evaluate_second_derivative(self, t):
-        _t = torch.min(t, self._duration)  
+        _t = torch.clamp(t, self._st_time, self._duration)  
         s = _t/self._duration
         #if s > 1 return end pos
-        s = torch.min(s, torch.tensor(1.0))
 
         x = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 0] - self._start_pos[:, 0])
         y = 0.5*math.pi*math.pi*torch.cos(math.pi*s)/self._duration/self._duration * (self._end_pos[:, 1] - self._start_pos[:, 1])
         z = self.z_curve.evaluate_second_derivative(_t)
 
+        #filtering
+        x = torch.where(x <  25., x,  25.)
+        x = torch.where(x > -25., x, -25.)
+        print(x, y, z)
         return torch.stack((x, y, z), dim = 1)
 
 

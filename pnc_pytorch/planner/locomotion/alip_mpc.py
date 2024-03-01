@@ -10,6 +10,8 @@ from mpc.mpc import QuadCost, LinDx, GradMethods
 
 from pnc_pytorch.data_saver import DataSaver
 from config.draco3_alip_config import AlipParams
+from pnc_pytorch.planner.locomotion.alip_mpc_qpsolver import ALIPtorch_mpc as qp_mpc
+
 
 import shutil
 FFMPEG_BIN = shutil.which('ffmpeg')
@@ -32,7 +34,8 @@ plt.style.use('bmh')
 #TODO: check why doesn't match Ly des with actual state
 
 class ALIPtorch_mpc():
-    def __init__(self, robot, data_save = False):     
+    def __init__(self, robot, data_save = False):  
+        self._alip_torch_mpc = qp_mpc(robot)   
         self.eps = 1e-4 
         self.n_state = 4
         self.n_ctrl = 2
@@ -44,7 +47,7 @@ class ALIPtorch_mpc():
         #TODO: set parameters from configuration file
         self._Ts = AlipParams.TS 
         self._Tr = AlipParams.TS 
-        self._Nt = AlipParams.NT
+        self._Nt = AlipParams.NT_mpc
         self._Ns = AlipParams.NS
         self._mass = AlipParams.MASS
         self._zH = AlipParams.ZH
@@ -158,7 +161,12 @@ class ALIPtorch_mpc():
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
 
 
-        states, actions, objc = self.solve_mpc_coor(stance_leg, x, Lx_offset, Ly_des, Tr)
+        #states, actions, objc = self.solve_mpc_coor(stance_leg, x, Lx_offset, Ly_des, Tr)
+        _, u_sol = self._alip_torch_mpc.solve_mpc_coor(stance_leg, x, Lx_offset, Ly_des, Tr)
+        actions = u_sol
+        torch.set_printoptions(precision = 3)
+        print("mpc", actions[0,0])
+        print("qps", u_sol[0,0])
         #For now assume height is constant
         next_action_torso_frame = torch.cat((actions[0, :, :], torch.zeros(self._batch, 1, dtype = torch.double)), dim = 1)
         next_action_torso_frame = next_action_torso_frame.to(torso_ori.dtype)

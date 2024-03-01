@@ -3,6 +3,8 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import numpy as np
 import json
+import configparser
+
 import multiprocessing as mp
 from tqdm import tqdm
 from util import orbit_util
@@ -12,6 +14,14 @@ import torch
 
 def pretty_print(ob):
     print(json.dumps(ob, indent=4))
+
+
+
+# Function to read configuration from file
+def read_config(filename):
+    config = configparser.ConfigParser()
+    config.read(filename)
+    return config
 
 
 def euler_to_rot(angles):

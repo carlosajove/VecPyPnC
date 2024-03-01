@@ -55,7 +55,7 @@ class ALIPtrajectoryManager(object):
 
         #time vars
         self.swing_start_time = torch.zeros(self._n_batch, dtype = torch.double)
-
+        #self._initial_swing_foot_pos = torch.zeros(self._n_batch, 3, dtype = torch.double)
         #parameters:#set from parameters in ctrl arch
         self.swing_height = AlipParams.SWING_HEIGHT*torch.ones(self._n_batch, dtype = torch.double)
         self.refzH = AlipParams.ZH
