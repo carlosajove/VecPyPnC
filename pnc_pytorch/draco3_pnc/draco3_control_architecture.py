@@ -1,6 +1,6 @@
 import torch 
 
-from config.draco3_alip_config import WBCConfig, WalkingState, PnCConfig
+from config.draco3_alip_config import WBCConfig, WalkingState, PnCConfig, AlipParams
 from pnc_pytorch.control_architecture import ControlArchitecture
 from pnc_pytorch.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
 from pnc_pytorch.draco3_pnc.draco3_tci_container import Draco3TCIContainer
@@ -9,6 +9,7 @@ from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
 from pnc_pytorch.planner.locomotion.alip_mpc import ALIPtorch_mpc
+from pnc_pytorch.planner.locomotion.alip_mpc_qpsolver import ALIPtorch_mpc as ALIPtorch_mpc_qpsolv
 
 
 from pnc_pytorch.wbc.manager.ALIP_trajectory_manager import ALIPtrajectoryManager
@@ -37,6 +38,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # Initialize Planner
         # ======================================================================
         self._alip_mpc = ALIPtorch_mpc(robot, PnCConfig.SAVE_DATA)
+        self._alip_mpc_qpsolv = ALIPtorch_mpc_qpsolv(robot, PnCConfig.SAVE_DATA)
         # ======================================================================
         # Initialize Task Manager
         # ======================================================================
@@ -85,18 +87,20 @@ class Draco3ControlArchitecture(ControlArchitecture):
         # ======================================================================
         # Initialize State Machines
         # ======================================================================
-        
+        """
         self._state_machine[WalkingState.ALIP] = AlipLocomotion(self._n_batch, WalkingState.ALIP, self._alip_tm, 
                                                     self._alip_mpc, self._tci_container, robot, PnCConfig.SAVE_DATA)
-        
+        """
+        self._state_machine[WalkingState.ALIP] = AlipLocomotion(self._n_batch, WalkingState.ALIP, self._alip_tm, 
+                                                    self._alip_mpc_qpsolv, self._tci_container, robot, PnCConfig.SAVE_DATA)
         self._state_machine[WalkingState.STAND] = DoubleSupportStand(self._n_batch,
             WalkingState.STAND, self._trajectory_managers, self._reaction_force_managers, robot)
         self._state_machine[
-            WalkingState.STAND].end_time = 0.2 
+            WalkingState.STAND].end_time = 0.5 
         self._state_machine[
             WalkingState.STAND].rf_z_max_time = 0.1 * torch.ones(self._n_batch)
         self._state_machine[
-            WalkingState.STAND].com_height_des = 0.69 * torch.ones(self._n_batch)
+            WalkingState.STAND].com_height_des = AlipParams.ZH * torch.ones(self._n_batch)
 
         self._state_machine[WalkingState.BALANCE] = DoubleSupportBalance(self._n_batch,
             WalkingState.BALANCE, self._alip_tm, robot)

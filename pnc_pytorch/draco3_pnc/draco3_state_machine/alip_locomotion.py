@@ -1,9 +1,10 @@
 import torch
-
+import os
 from pnc_pytorch.state_machine import StateMachine
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 from pnc_pytorch.data_saver import DataSaver
 from config.draco3_alip_config import AlipParams
+from util import util
 """
 Must read the wbc state
 
@@ -16,9 +17,9 @@ Control fREQ
     updates
 """
 
-
 class AlipLocomotion(StateMachine):
     def __init__(self, batch, id, tm, alip_mpc, tci_container, robot, data_save = False):
+        self._script_dir= os.path.dirname(os.path.realpath(__file__))
         self._n_batch = batch
         self._robot = robot
         self._trajectory_manager = tm
@@ -46,11 +47,19 @@ class AlipLocomotion(StateMachine):
 
 
     def new_step(self, ids):
+        config = util.read_config('/home/carlos/Desktop/Austin/SeungHyeonProject/PyPnc_pytorch/config/draco3_alip_config_dyn.ini')
+        PARAMS = config['Parameters']
+        #self._Ts        = PARAMS.getfloat('TS')        * torch.ones(self._n_batch, dtype = torch.double)
+        self._Lx_offset = PARAMS.getfloat('LX_OFFSET') * torch.ones(self._n_batch, dtype = torch.double)
+        self._Ly_des    = PARAMS.getfloat('LY_DES')    * torch.ones(self._n_batch, dtype = torch.double)
+        self._des_com_yaw = PARAMS.getfloat('COM_YAW')    * torch.ones(self._n_batch, dtype = torch.double)
+
         self._trajectory_manager.stance_leg(self._stance_leg[ids], ids)
         self._state_machine_start_time[ids] = self._sp.curr_time * torch.ones(len(ids), dtype = torch.double)
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
 
         self._Tr = self._Ts - self._state_machine_time
+        #self._des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch, dtype = torch.double)
         self._trajectory_manager.des_com_yaw(self._des_com_yaw[ids], ids)
 
         self._trajectory_manager.setNewOri(ids) #TODO: TRAJECTORY FOR ORI
@@ -60,6 +69,7 @@ class AlipLocomotion(StateMachine):
         com_vel = self._robot.get_com_lin_vel()[ids]
         rfoot_pos = self._robot.get_link_iso("r_foot_contact")[ids, 0:3, 3]
         lfoot_pos = self._robot.get_link_iso("l_foot_contact")[ids, 0:3, 3]
+        print('hey', self._state_machine_time)
         self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], self._Tr[ids], torso_ori,
                                                              com_pos, com_vel, lfoot_pos, rfoot_pos)
 
@@ -94,6 +104,7 @@ class AlipLocomotion(StateMachine):
 
 
     def one_step(self, ids): #in the controller
+        print("yo", self._state_machine_time)
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
         t = self._state_machine_time + self._Tr - self._Ts
         self._trajectory_manager.updateDesired(t, ids)
