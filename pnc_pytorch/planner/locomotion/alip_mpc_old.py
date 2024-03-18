@@ -124,7 +124,6 @@ class ALIPtorch_mpc():
 
         #self.u_lower = None
         #self.u_upper = None
-        print(x_0.shape, self.Q.shape, self.q.shape, self.F.shape, self.u_upper.shape, self.u_lower.shape)
         nominal_states, nominal_actions, nominal_objs = mpc.MPC(
                 self.n_state, self.n_ctrl, self.Ns,
                 u_init= self.u_init,

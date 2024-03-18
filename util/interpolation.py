@@ -380,7 +380,6 @@ class AlipSwing2(object): # input is batched
         #filtering
         x = torch.where(x <  25., x,  25.)
         x = torch.where(x > -25., x, -25.)
-        print(x, y, z)
         return torch.stack((x, y, z), dim = 1)
 
 
