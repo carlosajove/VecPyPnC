@@ -1,5 +1,6 @@
 import torch
 import os
+import math
 from pnc_pytorch.state_machine import StateMachine
 from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 from pnc_pytorch.data_saver import DataSaver
@@ -62,18 +63,36 @@ class AlipLocomotion(StateMachine):
         #self._des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch, dtype = torch.double)
         self._trajectory_manager.des_com_yaw(self._des_com_yaw[ids], ids)
 
-        self._trajectory_manager.setNewOri(ids) #TODO: TRAJECTORY FOR ORI
-        torso_ori = self._trajectory_manager.des_torso_rot[ids]
-
         com_pos = self._robot.get_com_pos()[ids]
         com_vel = self._robot.get_com_lin_vel()[ids]
         rfoot_pos = self._robot.get_link_iso("r_foot_contact")[ids, 0:3, 3]
         lfoot_pos = self._robot.get_link_iso("l_foot_contact")[ids, 0:3, 3]
-        print('hey', self._state_machine_time)
+
+        turn_ids = torch.nonzero(self._des_com_yaw != 0).squeeze().tolist()
+
+        self._trajectory_manager.setNewOri(turn_ids) #TODO: TRAJECTORY FOR ORI
+        torso_ori = self._trajectory_manager.des_torso_rot[ids]
+
+
+        
         self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], self._Tr[ids], torso_ori,
-                                                             com_pos, com_vel, lfoot_pos, rfoot_pos)
+                                                             com_pos, com_vel, lfoot_pos, rfoot_pos, turn_ids)
+        
+        """ One step ahead
+        self._swfoot_end = self.solve_inertia_coor(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], self._Tr[ids], torso_ori,
+                                                             com_pos, com_vel, lfoot_pos, rfoot_pos, turn_ids)
+        """
+        
+
+        #RL policy
+        """
+        self._swinfoot_end += self._rl_fp_policy(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], com_pos,
+                                                 )"""
+        #Safety Projection
+
 
         self._trajectory_manager.generateSwingFtraj(self._state_machine_time[ids], self._Tr[ids], self._swfoot_end[ids], ids)
+
 
         #change contact and reaction forces
         new_rf_z_max_rfoot = torch.zeros(self._n_batch, dtype = torch.double)
@@ -104,10 +123,11 @@ class AlipLocomotion(StateMachine):
 
 
     def one_step(self, ids): #in the controller
-        print("yo", self._state_machine_time)
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
         t = self._state_machine_time + self._Tr - self._Ts
-        self._trajectory_manager.updateDesired(t, ids)
+        turn_ids = torch.nonzero(self._des_com_yaw[ids] != 0).squeeze().tolist()
+        not_turn_ids = torch.nonzero(self._des_com_yaw[ids] == 0).squeeze().tolist()
+        self._trajectory_manager.updateDesired(t, ids, turn_ids, not_turn_ids)
 
     def switchLeg(self, new_step_list):
         indices = torch.nonzero(self._sp.curr_time - self._state_machine_start_time > 0.5*self._Ts)

@@ -96,7 +96,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
         self._state_machine[WalkingState.STAND] = DoubleSupportStand(self._n_batch,
             WalkingState.STAND, self._trajectory_managers, self._reaction_force_managers, robot)
         self._state_machine[
-            WalkingState.STAND].end_time = 0.5 
+            WalkingState.STAND].end_time = 0.3
         self._state_machine[
             WalkingState.STAND].rf_z_max_time = 0.1 * torch.ones(self._n_batch)
         self._state_machine[

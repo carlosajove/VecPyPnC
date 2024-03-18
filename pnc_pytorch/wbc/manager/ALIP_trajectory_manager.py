@@ -91,10 +91,9 @@ class ALIPtrajectoryManager(object):
 
 
     def setNewOri(self, ids): #performs rotation of com_yaw angle along z axis
-        torso_rot = self._robot.get_link_iso(self.torso_id)[ids, 0:3, 0:3]
-        des_torso_rot = util.MakeHorizontalDirX(torso_rot)
-        self._des_torso_rot[ids] = util.rotationZ(self._des_com_yaw[ids], des_torso_rot)
-
+        #torso_rot = self._robot.get_link_iso(self.torso_id)[ids, 0:3, 0:3]
+        #des_torso_rot = util.MakeHorizontalDirX(torso_rot)
+        self._des_torso_rot[ids] = util.rotationZ(self._des_com_yaw[ids], self._des_torso_rot[ids])
 
         self.des_lfoot_iso[ids] = self._des_torso_rot[ids].clone().detach()
         self.des_rfoot_iso[ids] = self._des_torso_rot[ids].clone().detach()
@@ -104,7 +103,6 @@ class ALIPtrajectoryManager(object):
         self.des_ori_lfoot[ids] = self.des_ori_torso[ids].clone().detach()
         self.des_ori_rfoot[ids] = self.des_ori_torso[ids].clone().detach()        
         
-
 
 
         
@@ -140,20 +138,36 @@ class ALIPtrajectoryManager(object):
 
 
 
-    def updateDesired(self, curr_time, ids):
+    def updateDesired(self, curr_time, ids, turn_ids, not_turn_ids):
         assert len(ids) > 0
         assert self._stance_leg != None
 
         #Get Desired states from trajectories
         t = curr_time - self.swing_start_time
 
-        des_torso_quat = orbit_util.convert_quat(self.hermite_quat_torso.evaluate(t))[ids]
-        des_torso_quat_v  = self.hermite_quat_torso.evaluate_ang_vel(t)[ids]
-        des_torso_quat_a = self.hermite_quat_torso.evaluate_ang_acc(t)[ids]
+        des_torso_quat = torch.zeros(len(ids), 4, dtype = torch.double)
+        des_torso_quat_v = torch.zeros(len(ids), 3, dtype = torch.double)
+        des_torso_quat_a = torch.zeros_like(des_torso_quat_v)
+        des_swfoot_quat = torch.zeros_like(des_torso_quat)
+        des_swfoot_quat_v  =  torch.zeros_like(des_torso_quat_v)
+        des_swfoot_quat_a =  torch.zeros_like(des_torso_quat_v)
+        
+        if (len(turn_ids) > 0):
+            des_torso_quat[turn_ids] = orbit_util.convert_quat(self.hermite_quat_torso.evaluate(t))[ids][turn_ids]
+            des_torso_quat_v[turn_ids]  = self.hermite_quat_torso.evaluate_ang_vel(t)[ids][turn_ids]
+            des_torso_quat_a[turn_ids] = self.hermite_quat_torso.evaluate_ang_acc(t)[ids][turn_ids]
 
-        des_swfoot_quat = orbit_util.convert_quat(self.hermite_quat_swfoot.evaluate(t))[ids]
-        des_swfoot_quat_v  = self.hermite_quat_swfoot.evaluate_ang_vel(t)[ids]
-        des_swfoot_quat_a = self.hermite_quat_swfoot.evaluate_ang_acc(t)[ids]
+            des_swfoot_quat[turn_ids] = orbit_util.convert_quat(self.hermite_quat_swfoot.evaluate(t))[ids][turn_ids]
+            des_swfoot_quat_v[turn_ids]  = self.hermite_quat_swfoot.evaluate_ang_vel(t)[ids][turn_ids]
+            des_swfoot_quat_a[turn_ids] = self.hermite_quat_swfoot.evaluate_ang_acc(t)[ids][turn_ids]
+        if(len(not_turn_ids) > 0):
+            des_torso_quat[not_turn_ids] = self.des_ori_torso[ids][not_turn_ids]
+
+            des_swfoot_quat[not_turn_ids] = self.des_ori_torso[ids][not_turn_ids]
+
+
+
+
 
         self.des_sw_foot_pos = self.AlipSwing2_curve.evaluate(t)[ids]
         self.des_sw_foot_vel = self.AlipSwing2_curve.evaluate_first_derivative(t)[ids]
@@ -212,12 +226,16 @@ class ALIPtrajectoryManager(object):
         # COM TASK #
         ############
         com_pos = self._robot.get_com_pos().clone()[ids]
+        com_pos_z = com_pos[:,2]
         com_vel = self._robot.get_com_lin_vel().clone()[ids]
         #com_pos[:, 1] = torch.zeros(self._n_batch)
         #com_vel[:, 1] = torch.zeros(self._n_batch)
         com_pos[:, 2] = self.refzH*torch.ones(len(ids), dtype=torch.double)
+        #com_vel[:, 2] = torch.zeros(len(ids), dtype = torch.double)
+        
+        #com_vel[:, 2] = (com_pos[:,2]-com_pos_z)/self.Ts
         com_vel[:, 2] = torch.zeros(len(ids), dtype = torch.double)
-
+        print(com_vel, "com_vel")
         self._com_task.w_hierarchy = self._com_z_task_weight
         self._com_task.update_desired(com_pos, com_vel, torch.zeros(len(ids), 3, dtype = torch.double), ids)
 

@@ -136,8 +136,7 @@ class ALIPmixedtorch_mpc():
                 eps=1e-2,
             )(x_0, QuadCost(self.Q, self.q), LinDx(self.F))
         self.up_u_init(nominal_actions)
-        print("input", x_0)
-        print("action: ", nominal_actions[0])
+
 
         if self._b_data_save:
             self._data_saver.add('mpc_actions', nominal_actions)
@@ -189,8 +188,7 @@ class ALIPmixedtorch_mpc():
         _x = torch.cat((x, self._zH*torch.ones(self.n_batch).unsqueeze(1)), dim = 1) 
                 
         vel_torso_ori[:,2] = torch.zeros(self.n_batch)
-        print("position", _x)
-        print("vel_torso_ori", vel_torso_ori)
+
         L = self.mass*torch.linalg.cross(_x, vel_torso_ori)
 
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
@@ -200,7 +198,6 @@ class ALIPmixedtorch_mpc():
         action = actions[0, :, :]
     
         next_action_torso_frame = action - self._a*x[:, 0:2]
-        print("action", action)
 
         #next_action_torso_frame = actions[0, :, :] - x[:, 0:2]
 

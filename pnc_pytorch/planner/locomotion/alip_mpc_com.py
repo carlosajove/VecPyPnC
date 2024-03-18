@@ -98,7 +98,6 @@ class ALIPcomtorch_mpc():
         x = x.to(exp_Atr.dtype)
         x_0 = torch.matmul(exp_Atr, x.unsqueeze(2)).squeeze()
         #x_0 = x
-        print("stance_sign_new", self.stance_sign[0])
         #TODO: look at code status about the problem with this
         if(self.stance_sign[0] == 1): #set bounds TODO:CHECK f is the good one
             self.u_lower = self.u_lower_plus
@@ -137,8 +136,6 @@ class ALIPcomtorch_mpc():
 
         if self._b_data_save:
             self.counter += 1
-            print("counter", self.counter)
-            print(stance_leg)
             self._data_saver.add('mpc_states', stance_leg)
             self._data_saver.add('mpc_actions', nominal_actions)
             self._data_saver.add('mpc_states', nominal_states)
@@ -189,8 +186,6 @@ class ALIPcomtorch_mpc():
         _x = torch.cat((x, self._zH*torch.ones(self.n_batch).unsqueeze(1)), dim = 1) 
                 
         vel_torso_ori[:,2] = torch.zeros(self.n_batch)
-        print("position", _x)
-        print("vel_torso_ori", vel_torso_ori)
         L = self.mass*torch.linalg.cross(_x, vel_torso_ori)
 
         x = torch.cat((x, L[:, 0].unsqueeze(1), L[:, 1].unsqueeze(1)), dim = 1)
@@ -204,7 +199,6 @@ class ALIPcomtorch_mpc():
         else:
             action[:, 1] = torch.clamp(action[:, 1], -self._ufp_y_ext, self._ufp_y_int)
         next_action_torso_frame = action - x[:, 0:2]
-        print("action", action)
 
         #next_action_torso_frame = actions[0, :, :] - x[:, 0:2]
 
