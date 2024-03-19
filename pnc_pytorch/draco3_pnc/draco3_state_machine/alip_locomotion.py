@@ -6,6 +6,7 @@ from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 from pnc_pytorch.data_saver import DataSaver
 from config.draco3_alip_config import AlipParams
 from util import util
+from util import orbit_util
 """
 Must read the wbc state
 
@@ -36,6 +37,7 @@ class AlipLocomotion(StateMachine):
         self._rf_z_MAX  = AlipParams.RF_Z_MAX  * torch.ones(self._n_batch, dtype = torch.double)
         self._rf_z_max  = 1e-4                 * torch.ones(self._n_batch, dtype = torch.double)
         self._des_com_yaw = AlipParams.COM_YAW * torch.ones(self._n_batch, dtype = torch.double)
+        self._mass = AlipParams.MASS
 
         self._b_data_save = data_save
         if self._b_data_save:
@@ -47,13 +49,11 @@ class AlipLocomotion(StateMachine):
 
 
 
-    def new_step(self, ids):
-        config = util.read_config('/home/carlos/Desktop/Austin/SeungHyeonProject/PyPnc_pytorch/config/draco3_alip_config_dyn.ini')
-        PARAMS = config['Parameters']
-        #self._Ts        = PARAMS.getfloat('TS')        * torch.ones(self._n_batch, dtype = torch.double)
-        self._Lx_offset = PARAMS.getfloat('LX_OFFSET') * torch.ones(self._n_batch, dtype = torch.double)
-        self._Ly_des    = PARAMS.getfloat('LY_DES')    * torch.ones(self._n_batch, dtype = torch.double)
-        self._des_com_yaw = PARAMS.getfloat('COM_YAW')    * torch.ones(self._n_batch, dtype = torch.double)
+    def new_step(self, ids, rl_action):
+        #self._Ts = self._sp.Ts
+        self._Lx_offset = self._sp.Lx_offset
+        self._Ly_des = self._sp.Ly_des
+        self._des_com_yaw = self._sp.des_com_yaw
 
         self._trajectory_manager.stance_leg(self._stance_leg[ids], ids)
         self._state_machine_start_time[ids] = self._sp.curr_time * torch.ones(len(ids), dtype = torch.double)
@@ -83,15 +83,14 @@ class AlipLocomotion(StateMachine):
                                                              com_pos, com_vel, lfoot_pos, rfoot_pos, turn_ids)
         """
         
-
         #RL policy
-        """
-        self._swinfoot_end += self._rl_fp_policy(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], com_pos,
-                                                 )"""
+        self._swfoot_end += rl_action[:, 0:1]
+
+
         #Safety Projection
 
 
-        self._trajectory_manager.generateSwingFtraj(self._state_machine_time[ids], self._Tr[ids], self._swfoot_end[ids], ids)
+        self._trajectory_manager.generateSwingFtraj(self._state_machine_time[ids], self._Tr[ids], self._swfoot_end[ids], rl_action[:,2], ids)
 
 
         #change contact and reaction forces
@@ -156,6 +155,7 @@ class AlipLocomotion(StateMachine):
             if self._b_data_save:
                 self._data_saver.add('leg_switch_time', (indices, self._sp.curr_time))
 
+        self._sp.stance_leg = self._stance_leg
         return new_step_list
 
 

@@ -76,9 +76,10 @@ class ALIPtorch_mpc():
         #TODO: getter function from param data
         self._ufp_x_max = AlipParams.UFP_X_MAX
         self._ufp_y_max = AlipParams.UFP_Y_MAX
-        self._ufp_y_min = AlipParams.UFP_Y_MIN
+        self._ufp_y_min_norm = AlipParams.UFP_Y_MIN
+        self._ufp_y_min_turning = AlipParams.UFP_Y_MIN_turn
         self._x_mech_limit = self._ufp_x_max/2
-        self.static_u_bounds()
+        #self.static_u_bounds()
         self.ineq_mat()
 
 
@@ -88,7 +89,7 @@ class ALIPtorch_mpc():
         #computes x_0 as   A(Ts)_x
         self._batch = x.shape[0]
         self.Tr = Tr.clone()
-
+        self.static_u_bounds()
         #DYNAMICS
 
         #STANCE LEG IDX
@@ -124,6 +125,7 @@ class ALIPtorch_mpc():
         actions = torch.clamp(u_sol, self.u_lower, self.u_upper)
 
         if self._b_data_save:
+            
             self._data_saver.add('mpc_actions', actions)
             self._data_saver.add('mpc_u_sol', u_sol)
             self._data_saver.add('mpc_states', state_sol)
@@ -148,7 +150,7 @@ class ALIPtorch_mpc():
 
     
     def solve_inertia_coor(self, stance_leg, Lx_offset, Ly_des, Tr, torso_ori,
-                           pos, vel, lfoot_pos, rfoot_pos):
+                           pos, vel, lfoot_pos, rfoot_pos, turn_ids):
         self._batch = pos.shape[0]
 
         stleg_pos = torch.where(stance_leg.unsqueeze(1) == 1, rfoot_pos, lfoot_pos)
@@ -189,9 +191,9 @@ class ALIPtorch_mpc():
         assert self._Ns%2 == 0 #Ns need to be even in order to work with the current implementation of the u_bounds
 
         u_upper_left_swing = torch.tensor([self._ufp_x_max/2, self._ufp_y_max], dtype = torch.double).unsqueeze(0)
-        u_lower_left_swing = torch.tensor([-self._ufp_x_max/2, self._ufp_y_min], dtype = torch.double).unsqueeze(0)
+        u_lower_left_swing = torch.tensor([-self._ufp_x_max/2, self._ufp_y_min_norm], dtype = torch.double).unsqueeze(0)
 
-        u_upper_right_swing = torch.tensor([self._ufp_x_max/2, -self._ufp_y_min], dtype = torch.double).unsqueeze(0)
+        u_upper_right_swing = torch.tensor([self._ufp_x_max/2, -self._ufp_y_min_norm], dtype = torch.double).unsqueeze(0)
         u_lower_right_swing = torch.tensor([-self._ufp_x_max/2, -self._ufp_y_max], dtype = torch.double).unsqueeze(0)
 
         self.u_upper_plus = u_upper_left_swing
@@ -244,7 +246,7 @@ class ALIPtorch_mpc():
         #desired state
         self.l = math.sqrt(self._g/self._zH)
 
-
+        print("width", self._w)
         q1 = self._px*(-2/self._mass/self._zH/self.l * math.tanh(self.l*self._Ts/2) * self.Ly_des)
         #leg dependent desired state
         q2_plus = self._py * self._w * torch.ones(self._batch, dtype = torch.double)
@@ -348,7 +350,6 @@ class ALIPtorch_mpc():
 
     def equality_contraint_vec(self, x_0, Tr): #already batched
         self._eq_cont_vec = torch.zeros(self._batch, 4*self._Ns*self._Nt, dtype = torch.double)
-        print("time", Tr, self._dt)
         exp_ATr = torch.linalg.matrix_exp(self._A.unsqueeze(0).repeat(self._batch, 1, 1)*(Tr).unsqueeze(1).unsqueeze(1))
         self._eq_cont_vec[:, 0:4] = torch.matmul(exp_ATr, x_0.unsqueeze(2)).squeeze()
         #np.savetxt('eq_vec.txt', self._eq_cont_vec.numpy(), fmt="%.3f")

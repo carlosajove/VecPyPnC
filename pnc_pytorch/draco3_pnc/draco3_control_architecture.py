@@ -121,7 +121,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
 
 
 
-    def get_command(self):
+    def get_command(self, rl_action):
         #ASSUMES ALL THE SIMULATIONS START WITH ALIP AT THE SAME TIME
         #THERE ARE NO ERRORS BEFORE WALKING STATE ALIP
         if self._b_state_first_visit:
@@ -133,7 +133,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
             ids_new_step = torch.nonzero(self._new_step_list == 0).squeeze().tolist()
             ids_one_step = torch.nonzero(self._new_step_list <= 0).squeeze().tolist()
             if (len(ids_new_step) > 0):
-                self._state_machine[self._state].new_step(ids_new_step)
+                self._state_machine[self._state].new_step(ids_new_step, rl_action)
             if (len(ids_one_step) > 0):
                 self._state_machine[self._state].one_step(ids_one_step)
 
@@ -143,8 +143,10 @@ class Draco3ControlArchitecture(ControlArchitecture):
             # Get Whole Body Control Commands
             command = self._draco3_controller.get_command()
             self._new_step_list = self._state_machine[self._state].switchLeg(self._new_step_list)
-            #self._state_machine[self._state]
-        
+
+            #RL COMMANDS
+            rl_trigger = torch.where(self._new_step_list == 0, True, False).squeeze().tolist()
+
         else: 
              # Update State Machine
             self._state_machine[self._state].one_step()
@@ -160,7 +162,13 @@ class Draco3ControlArchitecture(ControlArchitecture):
                 self._prev_state = self._state
                 self._state = self._state_machine[self._state].get_next_state()
                 self._b_state_first_visit = True
-        return command
+            
+            rl_trigger = [False]*self._n_batch
+            rl_wbc_obs = torch.zeros(self._n_batch, )
+
+        self._sp.update_command()
+        rl_wbc_obs = self._sp.get_rl_observation()
+        return command, rl_trigger, rl_wbc_obs
 
     @property
     def state_machine(self):
