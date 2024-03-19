@@ -108,7 +108,7 @@ class ALIPtrajectoryManager(object):
         
     #create AlipSwing
     #don't create a new interpolation, but update the class, with list of batch
-    def generateSwingFtraj(self, start_time, tr_, swfoot_end, ids):
+    def generateSwingFtraj(self, start_time, tr_, swfoot_end, residual_foot_yaw, ids):
         assert len(ids) > 0
         assert self._stance_leg != None
 
@@ -118,8 +118,6 @@ class ALIPtrajectoryManager(object):
                                                                                             self._robot.get_link_iso(self._rfoot_task.target_id)[ids])
         swfoot_rot = torch.where(self._stance_leg[ids].unsqueeze(1).unsqueeze(1) == 1, self._robot.get_link_iso(self._lfoot_task.target_id)[ids, 0:3, 0:3],
                                                                                        self._robot.get_link_iso(self._rfoot_task.target_id)[ids, 0:3, 0:3])
-        
-
         curr_swfoot_pos = curr_swfoot_iso[ids, 0:3, 3]
 
         self.AlipSwing2_curve.setParams(ids, curr_swfoot_pos, swfoot_end, self.swing_height[ids], tr_)
@@ -131,10 +129,18 @@ class ALIPtrajectoryManager(object):
 
         qbswing = orbit_util.convert_quat(self.des_ori_lfoot[ids], to = "wxyz")
         qbstorso = orbit_util.quat_from_matrix(self._des_torso_rot[ids])
+
+        # RL policy
+        residual_foot_quat = orbit_util.quat_from_euler_xyz(torch.zeros(self._n_batch, dtype = torch.double),
+                                                    torch.zeros(self._n_batch, dtype = torch.double),
+                                                    residual_foot_yaw)
+                                                            
+        full_swfoot_quat = orbit_util.quat_mul(qbswing, residual_foot_quat)
+
         self.hermite_quat_torso.setParams(ids, ori_torso_quat, qbstorso, torch.zeros(len(ids), 3, dtype = torch.double),
                                                                          torch.zeros(len(ids), 3, dtype = torch.double), tr_)
-        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, qbswing, torch.zeros(len(ids), 3, dtype = torch.double),
-                                                                      torch.zeros(len(ids), 3, dtype = torch.double), tr_)
+        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, full_swfoot_quat, torch.zeros(len(ids), 3, dtype = torch.double),
+                                                                               torch.zeros(len(ids), 3, dtype = torch.double), tr_)
 
 
 

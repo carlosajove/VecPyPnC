@@ -35,18 +35,24 @@ class WBCConfig(object):
 
     # Task Hierarchy Weights
     W_COM = 100.0
-    W_TORSO = 60.0
+    W_TORSO = 100.0
     W_UPPER_BODY = 40.0
-    W_CONTACT_FOOT = 60.0
-    W_SWING_FOOT = 80.0
+    W_CONTACT_FOOT = 100.0
+    W_SWING_FOOT = 60.0
 
     # Task Gains
-    KP_COM = torch.tensor([1000., 1000., 1000])
-    KD_COM = torch.tensor([50., 50., 50.])
-
-    KP_TORSO = torch.tensor([100., 100., 100])
+    KP_COM = torch.tensor([100., 100., 500])
+    KD_COM = torch.tensor([10., 10., 20.])
+    """
+    KP_COM = torch.tensor([2000., 2000., 2000])
+    KD_COM = torch.tensor([100., 100., 200.])
+    """
+    """
+    KP_TORSO = torch.tensor([100., 100., 50])
     KD_TORSO = torch.tensor([10., 10., 10.])
-
+    """
+    KP_TORSO = torch.tensor([1000., 1000., 500])
+    KD_TORSO = torch.tensor([30., 30., 30.])
     # ['neck_pitch', 'l_shoulder_fe', 'l_shoulder_aa', 'l_shoulder_ie',
     # 'l_elbow_fe', 'l_wrist_ps', 'l_wrist_pitch', 'r_shoulder_fe',
     # 'r_shoulder_aa', 'r_shoulder_ie', 'r_elbow_fe', 'r_wrist_ps',
@@ -90,18 +96,19 @@ class WalkingState(object):
     ALIP = 19
 
 class AlipParams(object):
-    N_BATCH = 5
+    N_BATCH = 2
     TS = 0.2
     NT_qp = 4
     NT_mpc = 1
     NS = 4
     MASS = 35.
     ZH = 0.69
-    WIDTH = 0.15
+    WIDTH = 0.05
     G = 9.81
-    UFP_X_MAX = 0.5
+    UFP_X_MAX = 0.55
     UFP_Y_MAX = 0.4
-    UFP_Y_MIN = 0.08
+    UFP_Y_MIN = 0.04
+    UFP_Y_MIN_turn = 0.15
     LX_OFFSET = 0.
     LY_DES = 0.
     COM_YAW = 0.
@@ -114,16 +121,17 @@ class AlipParams(object):
     PLY = 1.
     PBOUND = 5.
 
-    """
-    COM
+    RF_Z_MAX = 1000.0
+
+    #COM
     """
     UCOM_X_MAX = 0.3
     UCOM_Y_EXT = 0.3
     UCOM_Y_INT = 0.1
 
     """
-    Mixed
+    #Mixed
     """
     ALPHA = 0.7
 
-    RF_Z_MAX = 1000.0
+    """

@@ -48,10 +48,13 @@ class Draco3Interface(Interface):
             self._data_saver.add('joint_trq_limit',
                                  self._robot.joint_trq_limit)
 
-    def get_command(self, sensor_data):
+    def get_command(self, input_command):
         if PnCConfig.SAVE_DATA:
             self._data_saver.add('time', self._running_time)
             self._data_saver.add('phase', self._control_architecture.state)
+
+        sensor_data = input_command[0]
+        rl_action = input_command[1]
 
         # Update State Estimator
         if self._count == 0:
@@ -65,7 +68,8 @@ class Draco3Interface(Interface):
         self._interrupt_logic.process_interrupts()
 
         # Compute Cmd
-        command = self._control_architecture.get_command()
+        command, trigger, rl_obs = self._control_architecture.get_command(rl_action)
+        print(trigger)
         #print("interface", command)
 
         if PnCConfig.SAVE_DATA and (self._count % PnCConfig.SAVE_FREQ == 0):
@@ -80,7 +84,8 @@ class Draco3Interface(Interface):
         self._sp.prev_state = self._control_architecture.prev_state
         self._sp.state = self._control_architecture.state
 
-        return copy.deepcopy(command)
+        res = (command, trigger, rl_obs)
+        return copy.deepcopy(res)
 
     @property
     def interrupt_logic(self):

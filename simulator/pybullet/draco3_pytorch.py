@@ -12,6 +12,7 @@ import shutil
 import cv2
 import pybullet as p
 import numpy as np
+import torch
 
 np.set_printoptions(precision=2)
 
@@ -20,6 +21,7 @@ from pnc_pytorch.draco3_pnc.draco3_interface import Draco3Interface
 from util import pybullet_util
 from util import util
 from util import liegroup
+from config.draco3_alip_config import AlipParams
 
 gripper_joints = [
     "left_ezgripper_knuckle_palm_L1_1", "left_ezgripper_knuckle_L1_L2_1",
@@ -199,8 +201,19 @@ if __name__ == "__main__":
         # Compute Command
         if SimConfig.PRINT_TIME:
             start_time = time.time()
-        command = interface.get_command(copy.deepcopy(sensor_data))
+        
+        print(sensor_data)
+        rl_action = torch.zeros(AlipParams.N_BATCH, 3) #X, Y, YAW
+        input_command = (sensor_data, rl_action)
 
+        alip_command = interface.get_command(copy.deepcopy(input_command))
+        command = alip_command[0]
+        rl_trigger = alip_command[1]
+        #obs = sensordata + rl_obs --> in sensor data we need to change sensor data to foot frame
+        rl_obs = alip_command[2]
+
+        #rl_reward = alip_command[3]
+    
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)

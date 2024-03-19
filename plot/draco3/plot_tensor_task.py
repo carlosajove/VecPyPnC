@@ -83,7 +83,7 @@ phase = np.stack(phase, axis=0)
 ## =============================================================================
 
 plot_task(time, des['com_pos'], act['com_pos'], des['com_vel'], act['com_vel'],
-          phase, 'com lin', leg_switch_time)
+          phase, 'com lin') #, leg_switch_time)
 
 plot_task(time, des['torso_com_link_quat'], act['torso_com_link_quat'],
           des['torso_com_link_ang_vel'], act['torso_com_link_ang_vel'], phase,
@@ -91,23 +91,23 @@ plot_task(time, des['torso_com_link_quat'], act['torso_com_link_quat'],
 
 plot_task(time, des['selected_joint_pos'], act['selected_joint_pos'],
           des['selected_joint_vel'], act['selected_joint_vel'], phase,
-          'upperbody joint', leg_switch_time)
+          'upperbody joint') #, leg_switch_time)
 
 plot_task(time, des['l_foot_contact_pos'], act['l_foot_contact_pos'],
           des['l_foot_contact_vel'], act['l_foot_contact_vel'], phase,
-          'left foot lin', leg_switch_time)
+          'left foot lin') #, leg_switch_time)
 
 plot_task(time, des['l_foot_contact_quat'], act['l_foot_contact_quat'],
           des['l_foot_contact_ang_vel'], act['l_foot_contact_ang_vel'], phase,
-          'left foot ori', leg_switch_time)
+          'left foot ori') #, leg_switch_time)
 
 plot_task(time, des['r_foot_contact_pos'], act['r_foot_contact_pos'],
           des['r_foot_contact_vel'], act['r_foot_contact_vel'], phase,
-          'right foot lin', leg_switch_time)
+          'right foot lin') #, leg_switch_time)
 
 plot_task(time, des['r_foot_contact_quat'], act['r_foot_contact_quat'],
           des['r_foot_contact_ang_vel'], act['r_foot_contact_ang_vel'], phase,
-          'right foot ori', leg_switch_time)
+          'right foot ori') #, leg_switch_time)
 
 ## =============================================================================
 ## Plot WBC Solutions
