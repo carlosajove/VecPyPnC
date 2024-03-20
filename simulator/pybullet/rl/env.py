@@ -1,1 +1,355 @@
-hi carlos
+import gymnasium as gym
+import numpy as np
+import pybullet as p
+import pybullet_utils.bullet_client as bc
+import pybullet_data
+
+import os
+import sys
+
+cwd = os.getcwd()
+sys.path.append(cwd)
+import time, math
+from collections import OrderedDict
+import copy
+import signal
+import shutil
+
+import cv2
+
+from config.draco3_config import SimConfig
+from pnc.draco3_pnc.draco3_interface import Draco3Interface
+from util import pybullet_util
+
+GRIPPER_JOINTS = [
+    "left_ezgripper_knuckle_palm_L1_1", "left_ezgripper_knuckle_L1_L2_1",
+    "left_ezgripper_knuckle_palm_L1_2", "left_ezgripper_knuckle_L1_L2_2",
+    "right_ezgripper_knuckle_palm_L1_1", "right_ezgripper_knuckle_L1_L2_1",
+    "right_ezgripper_knuckle_palm_L1_2", "right_ezgripper_knuckle_L1_L2_2"
+]
+
+def set_initial_config(robot, joint_id, client):
+    # Upperbody
+    client.resetJointState(robot, joint_id["l_shoulder_aa"], np.pi / 6, 0.)
+    client.resetJointState(robot, joint_id["l_elbow_fe"], -np.pi / 2, 0.)
+    client.resetJointState(robot, joint_id["r_shoulder_aa"], -np.pi / 6, 0.)
+    client.resetJointState(robot, joint_id["r_elbow_fe"], -np.pi / 2, 0.)
+
+    # Lowerbody
+    hip_yaw_angle = 5
+    client.resetJointState(robot, joint_id["l_hip_aa"], np.radians(hip_yaw_angle),
+                      0.)
+    client.resetJointState(robot, joint_id["l_hip_fe"], -np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["l_knee_fe_jp"], np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["l_knee_fe_jd"], np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["l_ankle_fe"], -np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["l_ankle_ie"],
+                      np.radians(-hip_yaw_angle), 0.)
+
+    client.resetJointState(robot, joint_id["r_hip_aa"], np.radians(-hip_yaw_angle),
+                      0.)
+    client.resetJointState(robot, joint_id["r_hip_fe"], -np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["r_knee_fe_jp"], np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["r_knee_fe_jd"], np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["r_ankle_fe"], -np.pi / 4, 0.)
+    client.resetJointState(robot, joint_id["r_ankle_ie"], np.radians(hip_yaw_angle),
+                      0.)
+    
+class DracoEnv(gym.Env):
+    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
+    def __init__(self, render: bool = False) -> None:
+        self.render = render
+        if self.render:
+            self.client = bc.BulletClient(connection_mode=p.GUI)
+            self.client.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+        else:
+            self.client = bc.BulletClient(connection_mode=p.DIRECT)
+
+        self.action_space = gym.spaces.Box(
+            low = np.array([-2, -2, -2]),
+            high = np.array([2, 2, 2]),
+            dtype = np.float32
+        )
+        
+        self.observation_space = gym.spaces.Dict(
+            {
+                "base_com_pos" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "base_com_quat" : gym.spaces.Box(
+                    low=np.array([-2,-2,-2,-2]), high=np.array([2,2,2,2]),dtype=np.float32),
+                "base_com_lin_vel" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "base_com_ang_vel" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "base_joint_pos" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "base_joint_quat" : gym.spaces.Box(
+                    low=np.array([-7.0,-7.0,-7.0,-7.0]), high=np.array([7.0,7.0,7.0,7.0]),dtype=np.float32),
+                "base_joint_lin_vel" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "base_joint_ang_vel" : gym.spaces.Box(
+                    low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
+                "joint_pos" : gym.spaces.Dict(
+                    {
+                        "neck_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_elbow_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_wrist_ps" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_wrist_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_elbow_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_wrist_ps" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_wrist_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_knee_fe_jp" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_knee_fe_jd" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_ankle_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_ankle_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_knee_fe_jp" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_knee_fe_jd" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_ankle_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_ankle_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32), 
+                    }
+                ),
+                "joint_vel" : gym.spaces.Dict(
+                    {
+                        "neck_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_shoulder_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_elbow_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_wrist_ps" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_wrist_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_shoulder_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_elbow_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_wrist_ps" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_wrist_pitch" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_hip_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_knee_fe_jp" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_knee_fe_jd" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_ankle_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "l_ankle_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_aa" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_hip_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_knee_fe_jp" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_knee_fe_jd" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_ankle_fe" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32),
+                        "r_ankle_ie" : gym.spaces.Box(low=-7.0,high=7.0,dtype=np.float32), 
+                    }
+                ),
+                "b_rf_contact" : gym.spaces.MultiBinary(1),
+                "b_lf_contact" : gym.spaces.MultiBinary(1),
+            }
+        )
+    
+    def reset(self):
+        # Environment Setup
+        self.client.resetDebugVisualizerCamera(
+            cameraDistance=1.0,
+            cameraYaw=120,
+            cameraPitch=-30,
+            cameraTargetPosition=[1, 0.5, 1.0])
+        self.client.setGravity(0, 0, -9.8)
+        self.client.setPhysicsEngineParameter(
+            fixedTimeStep=SimConfig.CONTROLLER_DT, numSubSteps=SimConfig.N_SUBSTEP)
+        if SimConfig.VIDEO_RECORD:
+            video_dir = 'video/draco3_pnc'
+            if os.path.exists(video_dir):
+                shutil.rmtree(video_dir)
+            os.makedirs(video_dir)
+
+        # Create Robot, Ground
+        self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+        self.robot = self.client.loadURDF(cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
+                        SimConfig.INITIAL_POS_WORLD_TO_BASEJOINT,
+                        SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT)
+
+        self.client.loadURDF(cwd + "/robot_model/ground/plane.urdf", [0, 0, 0])
+        self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+        nq, nv, na,self.joint_id,self.link_id, self.pos_basejoint_to_basecom, self.rot_basejoint_to_basecom = pybullet_util.get_robot_config(
+            self.robot, SimConfig.INITIAL_POS_WORLD_TO_BASEJOINT,
+            SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT, SimConfig.PRINT_ROBOT_INFO)
+
+        # Add Gear constraint
+        c = self.client.createConstraint(
+            self.robot,
+           self.link_id['l_knee_fe_lp'],
+            self.robot,
+           self.link_id['l_knee_fe_ld'],
+            jointType=p.JOINT_GEAR,
+            jointAxis=[0, 1, 0],
+            parentFramePosition=[0, 0, 0],
+            childFramePosition=[0, 0, 0])
+        self.client.changeConstraint(c, gearRatio=-1, maxForce=500, erp=10)
+
+        c = self.client.createConstraint(
+            self.robot,
+           self.link_id['r_knee_fe_lp'],
+            self.robot,
+           self.link_id['r_knee_fe_ld'],
+            jointType=p.JOINT_GEAR,
+            jointAxis=[0, 1, 0],
+            parentFramePosition=[0, 0, 0],
+            childFramePosition=[0, 0, 0])
+        self.client.changeConstraint(c, gearRatio=-1, maxForce=500, erp=10)
+
+        # Initial Config
+        set_initial_config(self.robot, self.joint_id, self.client)
+
+        # Link Damping
+        pybullet_util.set_link_damping(self.robot, self.link_id.values(), 0., 0.)
+
+        # Joint Friction
+        pybullet_util.set_joint_friction(self.robot,self.joint_id, 0.)
+        gripper_attached_joint_id = OrderedDict()
+        gripper_attached_joint_id["l_wrist_pitch"] = self.joint_id["l_wrist_pitch"]
+        gripper_attached_joint_id["r_wrist_pitch"] = self.joint_id["r_wrist_pitch"]
+        pybullet_util.set_joint_friction(self.robot, gripper_attached_joint_id, 0.1)
+
+        nominal_sensor_data = pybullet_util.get_sensor_data(
+        self.robot,self.joint_id,self.link_id, self.pos_basejoint_to_basecom,
+        self.rot_basejoint_to_basecom)
+
+        self.gripper_command = dict()
+        for gripper_joint in GRIPPER_JOINTS:
+            self.gripper_command[gripper_joint] = nominal_sensor_data['joint_pos'][
+                gripper_joint]
+            
+        obs = copy.deepcopy(nominal_sensor_data)
+
+        for gripper_joint in GRIPPER_JOINTS:
+            del obs['joint_pos'][gripper_joint]
+            del obs['joint_vel'][gripper_joint]
+
+        rf_height = pybullet_util.get_link_iso(self.robot,
+                                              self.link_id['r_foot_contact'])[2, 3]
+        lf_height = pybullet_util.get_link_iso(self.robot,
+                                              self.link_id['l_foot_contact'])[2, 3]
+        obs['b_rf_contact'] = True if rf_height <= 0.01 else False
+        obs['b_lf_contact'] = True if lf_height <= 0.01 else False
+
+        info = {"gripper_command" : self.gripper_command}
+            
+        return obs, info
+    
+    def step(self, action: tuple):
+        command, self.gripper_command = action[0], action[1]
+
+        self._set_motor_command(command)
+
+        self.client.stepSimulation()
+        if self.render: time.sleep(SimConfig.CONTROLLER_DT)
+
+        obs = self._get_observation()
+        reward = self._compute_reward()
+        done = self._compute_termination()
+        info = {"gripper_command" : self.gripper_command}
+
+        return obs, reward, done, info
+
+    def close(self):
+        self.client.disconnect()
+        self.client = None
+
+    def _set_motor_command(self, command) -> None:
+        # Exclude Knee Distal Joints Command
+        del command['joint_pos']['l_knee_fe_jd']
+        del command['joint_pos']['r_knee_fe_jd']
+        del command['joint_vel']['l_knee_fe_jd']
+        del command['joint_vel']['r_knee_fe_jd']
+        del command['joint_trq']['l_knee_fe_jd']
+        del command['joint_trq']['r_knee_fe_jd']
+
+        # Apply Command
+        pybullet_util.set_motor_trq(self.robot,self.joint_id, command['joint_trq'])
+        pybullet_util.set_motor_pos(self.robot,self.joint_id, self.gripper_command)
+
+    def _get_observation(self) -> dict:
+
+         # Get SensorData
+        obs = pybullet_util.get_sensor_data(self.robot,self.joint_id,self.link_id,
+                                                    self.pos_basejoint_to_basecom,
+                                                    self.rot_basejoint_to_basecom)
+        
+        for gripper_joint in GRIPPER_JOINTS:
+            del obs['joint_pos'][gripper_joint]
+            del obs['joint_vel'][gripper_joint]
+
+        rf_height = pybullet_util.get_link_iso(self.robot,
+                                              self.link_id['r_foot_contact'])[2, 3]
+        lf_height = pybullet_util.get_link_iso(self.robot,
+                                              self.link_id['l_foot_contact'])[2, 3]
+        obs['b_rf_contact'] = True if rf_height <= 0.01 else False
+        obs['b_lf_contact'] = True if lf_height <= 0.01 else False
+
+        return obs
+    
+    def _compute_reward(self):
+        # TODO
+        # impliment reward terms
+        return 0
+
+    def _compute_termination(self):
+        # TODO
+        # impliment termination conditions
+        return False
+
+if __name__ == "__main__":
+    env = DracoEnv(True)
+    obs, info = env.reset()
+    gripper_command = info["gripper_command"]
+
+    interface = Draco3Interface()
+
+    while True:
+
+        # Get Keyboard Event
+        keys = p.getKeyboardEvents()
+        if pybullet_util.is_key_triggered(keys, '8'):
+            interface.interrupt_logic.b_interrupt_button_eight = True
+        elif pybullet_util.is_key_triggered(keys, '5'):
+            interface.interrupt_logic.b_interrupt_button_five = True
+        elif pybullet_util.is_key_triggered(keys, '4'):
+            interface.interrupt_logic.b_interrupt_button_four = True
+        elif pybullet_util.is_key_triggered(keys, '2'):
+            interface.interrupt_logic.b_interrupt_button_two = True
+        elif pybullet_util.is_key_triggered(keys, '6'):
+            interface.interrupt_logic.b_interrupt_button_six = True
+        elif pybullet_util.is_key_triggered(keys, '7'):
+            interface.interrupt_logic.b_interrupt_button_seven = True
+        elif pybullet_util.is_key_triggered(keys, '9'):
+            interface.interrupt_logic.b_interrupt_button_nine = True
+        elif pybullet_util.is_key_triggered(keys, '0'):
+            interface.interrupt_logic.b_interrupt_button_zero = True
+        elif pybullet_util.is_key_triggered(keys, 'c'):
+            for k, v in gripper_command.items():
+                gripper_command[k] += 1.94 / 3.
+        elif pybullet_util.is_key_triggered(keys, 'o'):
+            for k, v in gripper_command.items():
+                gripper_command[k] -= 1.94 / 3.
+
+        # Compute Command
+        if SimConfig.PRINT_TIME:
+            start_time = time.time()
+        command = interface.get_command(copy.deepcopy(obs))
+
+        if SimConfig.PRINT_TIME:
+            end_time = time.time()
+            print("ctrl computation time: ", end_time - start_time)
+
+        obs, reward, done, info = env.step((command, gripper_command))
+        gripper_command = info["gripper_command"]
