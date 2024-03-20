@@ -265,7 +265,7 @@ class DracoEnv(gym.Env):
 
         info = {
             "gripper_command" : self.gripper_command,
-        #    "interface" : self.interface,
+            "interface" : self.interface,
             }
         obs_numpy  = dict_to_numpy(self.obs)
             
@@ -291,7 +291,6 @@ class DracoEnv(gym.Env):
         done = self._compute_termination()
         info = {
             "gripper_command" : self.gripper_command,
-        #    "interface" : self.interface,
             }
         obs_numpy  = dict_to_numpy(self.obs)
 
@@ -383,4 +382,3 @@ if __name__ == "__main__":
 
         obs, reward, done, info = env.step((0, gripper_command))
         gripper_command = info["gripper_command"]
-        interface = info["interface"]
