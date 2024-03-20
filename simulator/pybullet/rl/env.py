@@ -274,12 +274,11 @@ class DracoEnv(gym.Env):
     def step(self, action):
         #residual, self.gripper_command = action[0], action[1]
 
-        if self.render:
-            start_time = time.time()
-        command = self.interface.get_command(self.obs)
-        if self.render:
-            end_time = time.time()
-            print("ctrl computation time: ", end_time - start_time)
+        # TODO remove printing
+
+        step_flag = False
+        while not step_flag:
+            command, step_flag, policy_obs = self.interface.get_command(self.obs) # TODO pass in residual
         
         self._set_motor_command(command)
 
@@ -350,35 +349,7 @@ if __name__ == "__main__":
     check_env(env)
 
     obs, info = env.reset()
-    gripper_command = info["gripper_command"]
     interface = info["interface"]
 
     while True:
-
-        # Get Keyboard Event
-        keys = p.getKeyboardEvents()
-        if pybullet_util.is_key_triggered(keys, '8'):
-            interface.interrupt_logic.b_interrupt_button_eight = True
-        elif pybullet_util.is_key_triggered(keys, '5'):
-            interface.interrupt_logic.b_interrupt_button_five = True
-        elif pybullet_util.is_key_triggered(keys, '4'):
-            interface.interrupt_logic.b_interrupt_button_four = True
-        elif pybullet_util.is_key_triggered(keys, '2'):
-            interface.interrupt_logic.b_interrupt_button_two = True
-        elif pybullet_util.is_key_triggered(keys, '6'):
-            interface.interrupt_logic.b_interrupt_button_six = True
-        elif pybullet_util.is_key_triggered(keys, '7'):
-            interface.interrupt_logic.b_interrupt_button_seven = True
-        elif pybullet_util.is_key_triggered(keys, '9'):
-            interface.interrupt_logic.b_interrupt_button_nine = True
-        elif pybullet_util.is_key_triggered(keys, '0'):
-            interface.interrupt_logic.b_interrupt_button_zero = True
-        elif pybullet_util.is_key_triggered(keys, 'c'):
-            for k, v in gripper_command.items():
-                gripper_command[k] += 1.94 / 3.
-        elif pybullet_util.is_key_triggered(keys, 'o'):
-            for k, v in gripper_command.items():
-                gripper_command[k] -= 1.94 / 3.
-
         obs, reward, done, trunc, info = env.step(None)
-        gripper_command = info["gripper_command"]
