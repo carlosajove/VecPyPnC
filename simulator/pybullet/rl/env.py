@@ -55,6 +55,19 @@ def set_initial_config(robot, joint_id, client):
     client.resetJointState(robot, joint_id["r_ankle_ie"], np.radians(hip_yaw_angle),
                       0.)
     
+def dict_to_numpy(obs_dict):
+    obs = []
+    for k,v in obs_dict.items():
+        if isinstance(v,dict):
+            for k2,v2 in v.items():
+                obs.append(v2)
+        elif isinstance(v,np.ndarray) or isinstance(v,list) or isinstance(v,tuple):
+            for i in range(len(v)):
+                obs.append(v[i])
+        else:
+            obs.append(v)
+    return np.array(obs)
+    
 class DracoEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
     def __init__(self, render: bool = False) -> None:
@@ -68,10 +81,10 @@ class DracoEnv(gym.Env):
         self.action_space = gym.spaces.Box(
             low = np.array([-2, -2, -2]),
             high = np.array([2, 2, 2]),
-            dtype = np.float32
+            dtype = np.float64
         )
         
-        self.observation_space = gym.spaces.Dict(
+        """self.observation_space = gym.spaces.Dict(
             {
                 "base_com_pos" : gym.spaces.Box(
                     low=np.array([-100.0,-100.0,-100.0]), high=np.array([100.0,100.0,100.0]),dtype=np.float32),
@@ -154,9 +167,15 @@ class DracoEnv(gym.Env):
                 "b_rf_contact" : gym.spaces.MultiBinary(1),
                 "b_lf_contact" : gym.spaces.MultiBinary(1),
             }
+        )"""
+
+        self.observation_space = gym.spaces.Box(
+            low = np.array([-100]*82),
+            high = np.array([100]*82),
+            dtype = np.float64
         )
     
-    def reset(self):
+    def reset(self, seed: int = 0):
         # Environment Setup
         self.client.resetDebugVisualizerCamera(
             cameraDistance=1.0,
@@ -229,37 +248,54 @@ class DracoEnv(gym.Env):
             self.gripper_command[gripper_joint] = nominal_sensor_data['joint_pos'][
                 gripper_joint]
             
-        obs = copy.deepcopy(nominal_sensor_data)
+        self.obs = copy.deepcopy(nominal_sensor_data)
 
         for gripper_joint in GRIPPER_JOINTS:
-            del obs['joint_pos'][gripper_joint]
-            del obs['joint_vel'][gripper_joint]
+            del self.obs['joint_pos'][gripper_joint]
+            del self.obs['joint_vel'][gripper_joint]
 
         rf_height = pybullet_util.get_link_iso(self.robot,
                                               self.link_id['r_foot_contact'])[2, 3]
         lf_height = pybullet_util.get_link_iso(self.robot,
                                               self.link_id['l_foot_contact'])[2, 3]
-        obs['b_rf_contact'] = True if rf_height <= 0.01 else False
-        obs['b_lf_contact'] = True if lf_height <= 0.01 else False
+        self.obs['b_rf_contact'] = True if rf_height <= 0.01 else False
+        self.obs['b_lf_contact'] = True if lf_height <= 0.01 else False
 
-        info = {"gripper_command" : self.gripper_command}
+        self.interface = Draco3Interface()
+
+        info = {
+            "gripper_command" : self.gripper_command,
+            "interface" : self.interface,
+            }
+        obs_numpy  = dict_to_numpy(self.obs)
             
-        return obs, info
+        return obs_numpy, info
     
     def step(self, action: tuple):
-        command, self.gripper_command = action[0], action[1]
+        residual, self.gripper_command = action[0], action[1]
 
+        if self.render:
+            start_time = time.time()
+        command = self.interface.get_command(self.obs)
+        if self.render:
+            end_time = time.time()
+            print("ctrl computation time: ", end_time - start_time)
+        
         self._set_motor_command(command)
 
         self.client.stepSimulation()
         if self.render: time.sleep(SimConfig.CONTROLLER_DT)
 
-        obs = self._get_observation()
+        self.obs = self._get_observation()
         reward = self._compute_reward()
         done = self._compute_termination()
-        info = {"gripper_command" : self.gripper_command}
+        info = {
+            "gripper_command" : self.gripper_command,
+            "interface" : self.interface,
+            }
+        obs_numpy  = dict_to_numpy(self.obs)
 
-        return obs, reward, done, info
+        return obs_numpy, reward, done, done, info # need terminated AND truncated
 
     def close(self):
         self.client.disconnect()
@@ -310,10 +346,13 @@ class DracoEnv(gym.Env):
 
 if __name__ == "__main__":
     env = DracoEnv(True)
+
+    from stable_baselines3.common.env_checker import check_env
+    check_env(env)
+
     obs, info = env.reset()
     gripper_command = info["gripper_command"]
-
-    interface = Draco3Interface()
+    interface = info["interface"]
 
     while True:
 
@@ -342,14 +381,6 @@ if __name__ == "__main__":
             for k, v in gripper_command.items():
                 gripper_command[k] -= 1.94 / 3.
 
-        # Compute Command
-        if SimConfig.PRINT_TIME:
-            start_time = time.time()
-        command = interface.get_command(copy.deepcopy(obs))
-
-        if SimConfig.PRINT_TIME:
-            end_time = time.time()
-            print("ctrl computation time: ", end_time - start_time)
-
-        obs, reward, done, info = env.step((command, gripper_command))
+        obs, reward, done, info = env.step((0, gripper_command))
         gripper_command = info["gripper_command"]
+        interface = info["interface"]
