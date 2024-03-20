@@ -394,3 +394,7 @@ def quat_mul_xyzw(q1, q2):
 
 def quat_inv_xyzw(q):
     return orbit_util.convert_quat(orbit_util.quat_inv(orbit_util.convert_quat(q, to = "wxyz")))
+
+
+def quat_from_rot_vec(v):
+    return orbit_util.quat_from_angle_axis(torch.linalg.norm(v, dim = 1), v)

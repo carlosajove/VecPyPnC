@@ -202,7 +202,6 @@ if __name__ == "__main__":
         if SimConfig.PRINT_TIME:
             start_time = time.time()
         
-        print(sensor_data)
         rl_action = torch.zeros(AlipParams.N_BATCH, 3) #X, Y, YAW
         input_command = (sensor_data, rl_action)
 

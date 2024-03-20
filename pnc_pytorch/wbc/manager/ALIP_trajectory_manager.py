@@ -1,4 +1,5 @@
 import torch 
+import numpy as np
 from util import util
 from util import interpolation
 from util import orbit_util
@@ -70,8 +71,9 @@ class ALIPtrajectoryManager(object):
         self._swing_foot_ori_weight  = WBCConfig.W_SWING_FOOT * torch.ones(self._n_batch, dtype = torch.double)
 
         #Create curves classes
-        self.hermite_quat_torso = interpolation.HermiteCurveQuat_torch_test(self._n_batch)
-        self.hermite_quat_swfoot = interpolation.HermiteCurveQuat_torch_test(self._n_batch)
+        self.hermite_quat_torso = interpolation.HermiteCurveQuat_torch(self._n_batch)
+        self.hermite_quat_swfoot = interpolation.HermiteCurveQuat_torch(self._n_batch)
+
         self.AlipSwing2_curve = interpolation.AlipSwing2(self._n_batch)
 
 
@@ -157,7 +159,7 @@ class ALIPtrajectoryManager(object):
         des_swfoot_quat = torch.zeros_like(des_torso_quat)
         des_swfoot_quat_v  =  torch.zeros_like(des_torso_quat_v)
         des_swfoot_quat_a =  torch.zeros_like(des_torso_quat_v)
-        
+         
         if (len(turn_ids) > 0):
             des_torso_quat[turn_ids] = orbit_util.convert_quat(self.hermite_quat_torso.evaluate(t))[ids][turn_ids]
             des_torso_quat_v[turn_ids]  = self.hermite_quat_torso.evaluate_ang_vel(t)[ids][turn_ids]
@@ -168,7 +170,6 @@ class ALIPtrajectoryManager(object):
             des_swfoot_quat_a[turn_ids] = self.hermite_quat_swfoot.evaluate_ang_acc(t)[ids][turn_ids]
         if(len(not_turn_ids) > 0):
             des_torso_quat[not_turn_ids] = self.des_ori_torso[ids][not_turn_ids]
-
             des_swfoot_quat[not_turn_ids] = self.des_ori_torso[ids][not_turn_ids]
 
 
@@ -241,7 +242,6 @@ class ALIPtrajectoryManager(object):
         
         #com_vel[:, 2] = (com_pos[:,2]-com_pos_z)/self.Ts
         com_vel[:, 2] = torch.zeros(len(ids), dtype = torch.double)
-        print(com_vel, "com_vel")
         self._com_task.w_hierarchy = self._com_z_task_weight
         self._com_task.update_desired(com_pos, com_vel, torch.zeros(len(ids), 3, dtype = torch.double), ids)
 

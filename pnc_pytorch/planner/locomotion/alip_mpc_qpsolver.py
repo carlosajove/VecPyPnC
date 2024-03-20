@@ -246,7 +246,6 @@ class ALIPtorch_mpc():
         #desired state
         self.l = math.sqrt(self._g/self._zH)
 
-        print("width", self._w)
         q1 = self._px*(-2/self._mass/self._zH/self.l * math.tanh(self.l*self._Ts/2) * self.Ly_des)
         #leg dependent desired state
         q2_plus = self._py * self._w * torch.ones(self._batch, dtype = torch.double)

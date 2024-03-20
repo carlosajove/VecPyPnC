@@ -51,7 +51,6 @@ class Draco3StateProvider(metaclass=MetaSingleton):
         self._Ly_des    = PARAMS.getfloat('LY_DES')    * torch.ones(self._batch, dtype = torch.double)
         self._des_com_yaw = PARAMS.getfloat('COM_YAW')    * torch.ones(self._batch, dtype = torch.double) 
 
-        print("heyy", self._des_com_yaw)       
 
 
     def get_rl_observation(self):

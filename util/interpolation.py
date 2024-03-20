@@ -134,7 +134,7 @@ class HermiteCurveQuat(object):
 
         # Initialize Data Structures
         self._q0 = R.from_quat(quat_start)
-
+        
         if np.linalg.norm(ang_vel_start) < 1e-6:
             self._q1 = R.from_quat(quat_start) * R.from_quat([0., 0., 0., 1.])
         else:
@@ -212,6 +212,131 @@ class HermiteCurveQuat(object):
 
 
 
+class HermiteCurveQuat_torch(object):
+    #formalism "wxyz"
+    def __init__(self, n_batch):
+        self._n_batch = n_batch
+        self._q0 = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._w1 = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._w2 = torch.zeros(n_batch, 3, dtype = torch.double)
+        self._w3 = torch.zeros(n_batch, 3, dtype = torch.double)
+
+        self._qa = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._qb = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._wa = torch.zeros(n_batch, 3, dtype = torch.double)
+        self._wb = torch.zeros(n_batch, 3, dtype = torch.double)
+
+        self._q1 = torch.zeros(n_batch, 4, dtype = torch.double)
+        self._q2 = torch.zeros(n_batch, 4, dtype = torch.double)
+
+        self._duration = torch.ones(n_batch, dtype = torch.double)
+
+    def setParams(self, id, q_a, q_b, w_a, w_b, duration): #id must be a list of indexes
+        #formalism "wxyz"
+        self._qa[id] = q_a
+        self._qb[id] = q_b  #q3
+        self._wa[id] = w_a
+        self._wb[id] = w_b
+        self._duration[id] = duration
+
+        self._q0 = self._qa
+        self._w1 = self._wa/3.
+        self._w3 = self._wb/3.
+
+        
+        mask = torch.where(torch.linalg.norm(self._wa, dim = 1) < 1e-6, True, False)
+        idx_plus = torch.nonzero(mask).squeeze().tolist()
+        idx_minus = torch.nonzero(~mask).squeeze().tolist()
+        if len(idx_plus) > 0:
+            self._q1[idx_plus] = orbit_util.quat_mul(self._qa[idx_plus], 
+                                                     torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(len(idx_plus), 1))
+        if len(idx_minus) > 0:
+            """
+            rot_vec_1 = orbit_util.quat_from_angle_axis(torch.linalg.norm(self._w1[idx_minus]) * self._wa[idx_minus]/torch.linalg.norm(self._wa[idx_minus]))
+            self._q1[idx_minus] = orbit_util.quat_mul(self._qa[idx_minus],
+                                                      rot_vec_1)
+            """
+            self._q1[idx_minus] = orbit_util.quat_mul(self._qa[idx_minus], 
+                                                      util.quat_from_rot_vec(self._w1[idx_minus]))
+
+        mask2 = torch.where(torch.linalg.norm(self._wb, dim = 1) < 1e-6, True, False)
+        idx_plus2 = torch.nonzero(mask2).squeeze().tolist()
+        idx_minus2 = torch.nonzero(~mask2).squeeze().tolist()
+        if len(idx_plus2) > 0:
+            self._q2[idx_plus2] = orbit_util.quat_mul(self._qb[idx_plus2], 
+                                                      torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(len(idx_plus2), 1))
+        if len(idx_minus2) > 0:
+            self._q2[idx_minus2] = orbit_util.quat_mul(self._qa[idx_minus2],
+                                                       util.quat_from_rot_vec(self._w3[idx_minus2]))
+
+        self._omega_1aa = orbit_util.quat_mul(self._q1, orbit_util.quat_inv(self._q0))
+        self._omega_2aa = orbit_util.quat_mul(self._q2, orbit_util.quat_inv(self._q1))
+        self._omega_3aa = orbit_util.quat_mul(self._qb, orbit_util.quat_inv(self._q2))
+
+        self._omega_1 = orbit_util.axis_angle_from_quat(self._omega_1aa)
+        self._omega_2 = orbit_util.axis_angle_from_quat(self._omega_2aa)
+        self._omega_3 = orbit_util.axis_angle_from_quat(self._omega_3aa)
+
+
+    def _compute_basis(self, s_in):
+        s = torch.clamp(s_in, 0., 1.).unsqueeze(1)
+
+        self._b1 = 1 - (1 - s)**3
+        self._b2 = 3 * s**2 - 2 * s**3
+        self._b3 = s**3
+        self._bdot1 = 3 * (1 - s)**2
+        self._bdot2 = 6 * s - 6 * s**2
+        self._bdot3 = 3 * s**2
+        self._bddot1 = -6 * (1 - s)
+        self._bddot2 = 6 - 12 * s
+        self._bddot3 = 6 * s
+
+    def evaluate(self, s_in):
+        s_in = s_in/self._duration
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+
+        mask = torch.where(torch.linalg.norm(self._omega_1, dim = 1) > 1e-5, True, False)
+        idx_plus = torch.nonzero(mask).squeeze().tolist()
+        qtmp1 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
+        if (len(idx_plus) > 0):
+            qtmp1[idx_plus] = util.quat_from_rot_vec(self._b1[idx_plus]*self._omega_1[idx_plus])
+
+        mask2 = torch.where(torch.linalg.norm(self._omega_2, dim = 1) > 1e-5, True, False)
+        idx_plus2 = torch.nonzero(mask2).squeeze().tolist()
+        qtmp2 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
+        if (len(idx_plus2) > 0):
+            qtmp2[idx_plus2] = util.quat_from_rot_vec(self._b2[idx_plus2]*self._omega_2[idx_plus2])
+
+        mask3 = torch.where(torch.linalg.norm(self._omega_3, dim = 1) > 1e-5, True, False)
+        idx_plus3 = torch.nonzero(mask3).squeeze().tolist()
+        qtmp3 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
+        if (len(idx_plus3) > 0):
+            qtmp2[idx_plus3] = util.quat_from_rot_vec(self._b2[idx_plus3]*self._omega_2[idx_plus3])
+
+
+
+        return orbit_util.quat_mul(qtmp3, 
+                                    orbit_util.quat_mul(qtmp2, 
+                                                        orbit_util.quat_mul(qtmp1, self._q0)))
+
+    def evaluate_ang_vel(self, s_in):
+        s_in = s_in/self._duration
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+
+        return self._omega_1 * self._bdot1 + self._omega_2 * self._bdot2 + self._omega_3 * self._bdot3
+
+    def evaluate_ang_acc(self, s_in):
+        s_in = s_in/self._duration
+        s = torch.clamp(s_in, 0., 1.)
+        self._compute_basis(s)
+
+        return self._omega_1 * self._bddot1 + self._omega_2 * self._bddot2 + self._omega_3 * self._bddot3
+
+
+"""TODO: if have time see why problem when reaching a certain angle of turn
+        always same angle 
 class HermiteCurveQuat_torch_test(object):
     #https://dl.acm.org/doi/pdf/10.1145/218380.218486
     #quaternion formalism will be (w, x,, y, z)
@@ -283,7 +408,7 @@ class HermiteCurveQuat_torch_test(object):
         self._compute_basis(s)
 
         return self._w1 * self._bddot1 + self._w2 * self._bddot2 + self._w3* self._bddot3
-
+"""
 
 
     

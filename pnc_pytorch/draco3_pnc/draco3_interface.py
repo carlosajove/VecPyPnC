@@ -69,7 +69,6 @@ class Draco3Interface(Interface):
 
         # Compute Cmd
         command, trigger, rl_obs = self._control_architecture.get_command(rl_action)
-        print(trigger)
         #print("interface", command)
 
         if PnCConfig.SAVE_DATA and (self._count % PnCConfig.SAVE_FREQ == 0):
