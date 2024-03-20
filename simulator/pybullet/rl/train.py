@@ -16,7 +16,7 @@ if __name__ == "__main__":
     env = DracoEnv(render=False)
 
     ## train model
-    model = PPO("MlpPolicy", env, policy_kwargs=dict(net_arch=[64,64, dict(vf=[], pi=[])]), verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1) #policy_kwargs=dict(net_arch=[64,64, dict(vf=[], pi=[])]), 
     startTime = time.time()
     model.learn(total_timesteps=1000)
     endTime = time.time()
