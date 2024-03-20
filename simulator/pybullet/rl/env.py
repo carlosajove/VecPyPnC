@@ -380,5 +380,5 @@ if __name__ == "__main__":
             for k, v in gripper_command.items():
                 gripper_command[k] -= 1.94 / 3.
 
-        obs, reward, done, info = env.step(None)
+        obs, reward, done, trunc, info = env.step(None)
         gripper_command = info["gripper_command"]
