@@ -1,5 +1,6 @@
 import torch 
 import numpy as np
+import math
 from util import util
 from util import interpolation
 from util import orbit_util
@@ -40,8 +41,7 @@ class ALIPtrajectoryManager(object):
         self.des_sw_foot_vel = torch.zeros(self._n_batch, 3, dtype = torch.double)
         self.des_swfoot_acc = torch.zeros(self._n_batch, 3, dtype = torch.double)
 
-        self.des_ori_lfoot = torch.tensor([0, 0, 0, 1], dtype = torch.double).unsqueeze(0).repeat(self._n_batch, 1, 1)
-        self.des_ori_rfoot = torch.tensor([0, 0, 0, 1], dtype = torch.double).unsqueeze(0).repeat(self._n_batch, 1, 1)
+        self.des_swfoot_quat = torch.tensor([0, 0, 0, 1], dtype = torch.double).unsqueeze(0).repeat(self._n_batch, 1, 1)
         self.des_ori_torso = torch.tensor([0, 0, 0, 1], dtype = torch.double).unsqueeze(0).repeat(self._n_batch, 1, 1)
 
         self._des_torso_rot = torch.eye(3, dtype = torch.double).unsqueeze(0).repeat(self._n_batch, 1, 1)
@@ -83,34 +83,31 @@ class ALIPtrajectoryManager(object):
         des_torso_rot = self._robot.get_link_iso(self.torso_id)[:, 0:3, 0:3]
         self._des_torso_rot = util.MakeHorizontalDirX(des_torso_rot)
 
-        self.des_lfoot_iso = self._des_torso_rot.clone().detach()
-        self.des_rfoot_iso = self._des_torso_rot.clone().detach()
 
         self.des_ori_torso = orbit_util.convert_quat(orbit_util.quat_from_matrix(self._des_torso_rot))
-        self.des_ori_lfoot = self.des_ori_torso.clone().detach()
-        self.des_ori_rfoot = self.des_ori_torso.clone().detach()
+        self.des_swfoot_quat = self.des_ori_torso.clone().detach()
 
 
 
-    def setNewOri(self, ids): #performs rotation of com_yaw angle along z axis
+    def setNewOri(self, ids, residual_rl_yaw): #performs rotation of com_yaw angle along z axis
         #torso_rot = self._robot.get_link_iso(self.torso_id)[ids, 0:3, 0:3]
         #des_torso_rot = util.MakeHorizontalDirX(torso_rot)
+        assert len(ids) == residual_rl_yaw.shape[0]
         self._des_torso_rot[ids] = util.rotationZ(self._des_com_yaw[ids], self._des_torso_rot[ids])
-
-        self.des_lfoot_iso[ids] = self._des_torso_rot[ids].clone().detach()
-        self.des_rfoot_iso[ids] = self._des_torso_rot[ids].clone().detach()
         
 
         self.des_ori_torso[ids] = orbit_util.convert_quat(orbit_util.quat_from_matrix(self._des_torso_rot[ids]))
-        self.des_ori_lfoot[ids] = self.des_ori_torso[ids].clone().detach()
-        self.des_ori_rfoot[ids] = self.des_ori_torso[ids].clone().detach()        
-        
-
+        residual_rl_yaw /= 180/math.pi
+        residual_quat = orbit_util.convert_quat(
+                                        orbit_util.quat_from_euler_xyz(torch.zeros(len(ids)),
+                                                                       torch.zeros(len(ids)),
+                                                                        residual_rl_yaw))
+        self.des_swfoot_quat[ids] = util.quat_mul_xyzw(residual_quat, self.des_ori_torso[ids].clone().detach())
 
         
     #create AlipSwing
     #don't create a new interpolation, but update the class, with list of batch
-    def generateSwingFtraj(self, start_time, tr_, swfoot_end, residual_foot_yaw, ids):
+    def generateSwingFtraj(self, start_time, tr_, swfoot_end, ids):
         assert len(ids) > 0
         assert self._stance_leg != None
 
@@ -129,19 +126,12 @@ class ALIPtrajectoryManager(object):
         ori_torso_quat = orbit_util.quat_from_matrix(torso_rot)
         swfoot_quat = orbit_util.quat_from_matrix(swfoot_rot)
 
-        qbswing = orbit_util.convert_quat(self.des_ori_lfoot[ids], to = "wxyz")
+        qbswing = orbit_util.convert_quat(self.des_swfoot_quat[ids], to = "wxyz")
         qbstorso = orbit_util.quat_from_matrix(self._des_torso_rot[ids])
-
-        # RL policy
-        residual_foot_quat = orbit_util.quat_from_euler_xyz(torch.zeros(self._n_batch, dtype = torch.double),
-                                                    torch.zeros(self._n_batch, dtype = torch.double),
-                                                    residual_foot_yaw)
-                                                            
-        full_swfoot_quat = orbit_util.quat_mul(qbswing, residual_foot_quat)
 
         self.hermite_quat_torso.setParams(ids, ori_torso_quat, qbstorso, torch.zeros(len(ids), 3, dtype = torch.double),
                                                                          torch.zeros(len(ids), 3, dtype = torch.double), tr_)
-        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, full_swfoot_quat, torch.zeros(len(ids), 3, dtype = torch.double),
+        self.hermite_quat_swfoot.setParams(ids, swfoot_quat, qbswing, torch.zeros(len(ids), 3, dtype = torch.double),
                                                                                torch.zeros(len(ids), 3, dtype = torch.double), tr_)
 
 
