@@ -70,7 +70,7 @@ class AlipLocomotion(StateMachine):
 
         turn_ids = torch.nonzero(self._des_com_yaw != 0).squeeze().tolist()
 
-        self._trajectory_manager.setNewOri(turn_ids) #TODO: TRAJECTORY FOR ORI
+        self._trajectory_manager.setNewOri(ids, rl_action[:,2]) #TODO: TRAJECTORY FOR ORI
         torso_ori = self._trajectory_manager.des_torso_rot[ids]
 
 
@@ -90,7 +90,7 @@ class AlipLocomotion(StateMachine):
         #Safety Projection
 
 
-        self._trajectory_manager.generateSwingFtraj(self._state_machine_time[ids], self._Tr[ids], self._swfoot_end[ids], rl_action[:,2], ids)
+        self._trajectory_manager.generateSwingFtraj(self._state_machine_time[ids], self._Tr[ids], self._swfoot_end[ids], ids)
 
 
         #change contact and reaction forces
