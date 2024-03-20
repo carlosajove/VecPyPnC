@@ -271,8 +271,8 @@ class DracoEnv(gym.Env):
             
         return obs_numpy, info
     
-    def step(self, action: tuple):
-        residual, self.gripper_command = action[0], action[1]
+    def step(self, action):
+        #residual, self.gripper_command = action[0], action[1]
 
         if self.render:
             start_time = time.time()
