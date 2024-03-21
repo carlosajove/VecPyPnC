@@ -55,7 +55,6 @@ class Draco3Interface(Interface):
 
         sensor_data = input_command[0]
         rl_action = input_command[1]
-
         # Update State Estimator
         if self._count == 0:
             print("=" * 80)
@@ -63,6 +62,7 @@ class Draco3Interface(Interface):
             print("=" * 80)
             self._se.initialize(sensor_data)
         self._se.update(sensor_data)
+        self._se.inertia_to_com_torso_coor()
 
         # Process Interrupt Logic
         self._interrupt_logic.process_interrupts()
@@ -84,6 +84,7 @@ class Draco3Interface(Interface):
         self._sp.state = self._control_architecture.state
 
         res = (command, trigger, rl_obs)
+        #assert False
         return copy.deepcopy(res)
 
     @property

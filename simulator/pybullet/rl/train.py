@@ -23,5 +23,5 @@ if __name__ == "__main__":
     print("Model train time: "+str(datetime.timedelta(seconds=endTime-startTime)))
 
     ## save the model
-    #save_path = '{}/{}'.format(log_path_full,DT)
-    #model.save(save_path)
+    save_path = '{}/{}'.format("rl_model", "fist_try")
+    model.save(save_path)

@@ -41,7 +41,10 @@ class Draco3StateProvider(metaclass=MetaSingleton):
         self._Ly_des = AlipParams.LY_DES * torch.ones(self._batch, dtype = torch.double)
         self._des_com_yaw = AlipParams.COM_YAW * torch.ones(self._batch, dtype = torch.double)
         self._Tr = torch.clone(self._Ts)
-        
+        self._com_pos_stance_frame = torch.zeros(self._batch, 3, dtype = torch.double)
+        self._L_stance_frame = torch.zeros(self._batch, 3, dtype = torch.double)
+        self._stleg_pos = torch.zeros(self._batch, 3, dtype = torch.double)
+        self._torso_roll_pitch_yaw = torch.zeros(self._batch, 2, dtype = torch.double)
 
     def update_command(self):
         config = util.read_config('/home/carlos/Desktop/Austin/SeungHyeonProject/PyPnc_pytorch/config/draco3_alip_config_dyn.ini')
@@ -50,8 +53,6 @@ class Draco3StateProvider(metaclass=MetaSingleton):
         self._Lx_offset = PARAMS.getfloat('LX_OFFSET') * torch.ones(self._batch, dtype = torch.double)
         self._Ly_des    = PARAMS.getfloat('LY_DES')    * torch.ones(self._batch, dtype = torch.double)
         self._des_com_yaw = PARAMS.getfloat('COM_YAW')    * torch.ones(self._batch, dtype = torch.double) 
-
-
 
     def get_rl_observation(self):
         #TODO: right know works for one, might need to change to update the obs when multiple robots with different tempos in sim
@@ -73,46 +74,59 @@ class Draco3StateProvider(metaclass=MetaSingleton):
 
         #TODO: have a base and com may be redundant?
 
-
-        com_pos_stance_frame, L_stance_frame, stleg_pos = self.inertia_to_com_torso_coor()
-
         rl_wbc_obs = torch.cat((self._stance_leg.unsqueeze(1), 
                                 self._Lx_offset.unsqueeze(1), 
                                 self._Ly_des.unsqueeze(1), 
                                 self._des_com_yaw.unsqueeze(1), 
                                 self._Ts.unsqueeze(1), 
                                 self._Tr.unsqueeze(1), 
-                                com_pos_stance_frame, 
-                                L_stance_frame, 
-                                stleg_pos), dim = 1)
-        return rl_wbc_obs
-
-
-    def inertia_to_com_torso_coor(self):
-        com_pos = self._robot.get_com_pos()
-        com_vel = self._robot.get_com_lin_vel()
-        torso_matrix = self._robot.get_link_iso("torso_com_link")[:, 0:3, 0:3]
-        torso_quat = orbit_util.quat_from_matrix(torso_matrix)
-
-        rfoot_pos = self._robot.get_link_iso("r_foot_contact")[:, 0:3, 3]
-        lfoot_pos = self._robot.get_link_iso("l_foot_contact")[:, 0:3, 3]
-
-        stleg_pos = torch.where(self._stance_leg.unsqueeze(1) == 1, rfoot_pos, lfoot_pos)
-
-        com_pos_stleg = com_pos - stleg_pos
-
-        #stleg_pos = stleg_pos.to(torso_ori.dtype)
-        com_pos_stleg_torso_ori = orbit_util.quat_rotate_inverse(torso_quat, com_pos_stleg)
-        com_vel_torso_ori = orbit_util.quat_rotate_inverse(torso_quat, com_vel)
+                                self._com_pos_stance_frame, 
+                                self._L_stance_frame, 
+                                self._stleg_pos,
+                                self._torso_roll_pitch_yaw), dim = 1)
         
+        return torch.clone(rl_wbc_obs)
 
-        L = self._mass*torch.linalg.cross(com_pos_stleg_torso_ori, com_vel_torso_ori)
+    @property
+    def torso_roll_pitch_yaw(self):
+        return self._torso_roll_pitch_yaw
 
-        #could also add com_vel
-        return com_pos_stleg_torso_ori, L, stleg_pos 
+    @torso_roll_pitch_yaw.setter
+    def torso_roll_pitch_yaw(self, value):
+        self._torso_roll_pitch_yaw = value
 
+    @property 
+    def com_pos_stance_frame(self):
+        return self._com_pos_stance_frame
 
+    @com_pos_stance_frame.setter 
+    def com_pos_stance_frame(self, value):
+        self._com_pos_stance_frame = value
     
+    @property 
+    def L_stance_frame(self):
+        return self._L_stance_frame
+    
+    @L_stance_frame.setter
+    def L_stance_frame(self, value):
+        self._L_stance_frame = value
+
+    @property
+    def stleg_pos(self):
+        return self._stleg_pos
+    
+    @stleg_pos.setter
+    def stleg_pos(self, value):
+        self._stleg_pos = value
+
+    @property
+    def mass(self):
+        return self._mass
+
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
+
     @property
     def Ts(self):
         return self._Ts

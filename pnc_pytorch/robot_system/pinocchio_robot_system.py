@@ -135,7 +135,6 @@ class PinocchioRobotSystem(RobotSystem):
                       b_cent=False):
 
         assert len(joint_pos.keys()) == self._n_a
-
         self._q = np.zeros(self._n_q)
         self._q_dot = np.zeros(self._n_q_dot)
         self._joint_positions = np.zeros(self._n_a)
@@ -171,6 +170,7 @@ class PinocchioRobotSystem(RobotSystem):
 
         pin.forwardKinematics(self._model, self._data, self._q, self._q_dot)
 
+        #assert False
         if b_cent:
             self._update_centroidal_quantities()
 
