@@ -59,6 +59,88 @@ def set_initial_config(robot, joint_id):
                       0.)
 
 
+class rl_reward(object):
+    def __init__(self):
+        self._w_roll_pitch = 0.05
+        self._w_desired_Lxy = 0.1
+        self._w_desired_yaw = 0.1
+        self._w_com_height = 0.05
+        self._w_excessive_fp = 0.05
+        self._w_excessive_angle = 0.05
+        #self._w_termination = -100
+        self._w_alive_bonus = 1.
+
+        self._Lx_main = 0.5*AlipParams.WIDTH*AlipParams.MASS*math.sqrt(AlipParams.G/AlipParams.ZH) \
+                        *AlipParams.ZH*math.tanh(math.sqrt(AlipParams.G/AlipParams.ZH)*AlipParams.TS/2)
+        
+
+    def set_initial_obs(self, obs):
+        self._new_obs = obs
+
+    def set_action(self, action):
+        self._action = action
+
+    
+
+    def compute_reward(self, new_obs):
+        self._rl_obs = self._new_obs
+        self._new_obs = new_obs
+
+        reward = self._w_alive_bonus
+        reward += self.reward_tracking_com_L()
+        reward += self.reward_tracking_yaw()
+        reward += self.reward_com_height()
+        reward += self.reward_roll_pitch()
+        reward += self.penalise_excessive_fp()
+        reward += self.penalise_excessive_yaw()
+        return reward
+
+    def reward_tracking_com_L(self):
+        Lx = torch.zeros(AlipParams.N_BATCH, 3)
+        Lx[:, 0] = self._new_obs[:, 0]*self._Lx_main 
+        #in the code 1 corresponds to current stance foot right
+        # -1 to current stance foot left 
+        # new obs -1 --> ended policy for left foot --> we are at the desired state for end of right stance
+        error = Lx + self._rl_obs[:, 1:3] - self._new_obs[:, 9:11]  #desired Lx,y - observedLx,y at the end of the step
+        error = torch.sum(torch.square(error), dim = 1)
+        error *= self._w_desired_Lxy
+        return torch.exp(-error)
+    
+    def reward_tracking_yaw(self):
+        error = self._new_obs[:, 16] - self._rl_obs[:, 16] - self._rl_obs[:, 3]
+        error = torch.sum(torch.square(error), dim = 1)
+        error *= self._w_desired_yaw
+        return torch.exp(-error)
+
+    def reward_com_height(self):
+        error = self._new_obs[:, 8] - AlipParams.ZH
+        error = torch.square(error)
+        error *= self._w_com_height
+        return torch.exp(-error)
+
+    def reward_roll_pitch(self):
+        error = torch.sum(torch.square(self._new_obs[:, 14:16]), dim = 1)
+        error *= self._w_excess
+        return torch.exp(-error)
+    
+    def penalise_excessive_fp(self):
+        error = torch.sum(torch.square(self._rl_action[:, 0:2]), dim = 1)
+        error *= self._w_excessive_fp
+        return torch.exp(-error)
+    
+    def penalise_excessive_yaw(self):
+        error = torch.square(self._rl_action[:, 2])
+        error *= self._w_excessive_angle
+        return torch.exp(-error)
+
+def compute_policy_input(sensor_data, wbc_obs):
+    sensor_data["base_com_pos"] -= wbc_obs[:, 11:14]
+    #sensor_input = sensor_data_to_tensor() #TODO
+    wbc_input = wbc_obs[:, 0:12]
+    #torch.cat((sensor_input, wbc_input), dim = 1)
+
+
+
 def signal_handler(signal, frame):
     if SimConfig.VIDEO_RECORD:
         pybullet_util.make_video(video_dir, False)
@@ -69,7 +151,6 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
-
     # Environment Setup
     p.connect(p.GUI)
     p.resetDebugVisualizerCamera(
@@ -153,6 +234,12 @@ if __name__ == "__main__":
         gripper_command[gripper_joint] = nominal_sensor_data['joint_pos'][
             gripper_joint]
 
+    rl_trigger = [False]*AlipParams.N_BATCH
+    #set first obs to 0
+    first_wbc_obs = torch.zeros(AlipParams.N_BATCH, 18)
+    rl_action = torch.zeros(AlipParams.N_BATCH, 3)
+    #reward.set_initial_obs(first_wbc_obs)
+
     while (1):
 
         # Get SensorData
@@ -202,17 +289,35 @@ if __name__ == "__main__":
         if SimConfig.PRINT_TIME:
             start_time = time.time()
         
-        rl_action = torch.zeros(AlipParams.N_BATCH, 3) #X, Y, YAW
+        
+
+        if(rl_trigger[0] == True): #compute RL 
+            policy_input = compute_policy_input(sensor_data, rl_obs)
+            rl_action = torch.zeros(AlipParams.N_BATCH, 3) #X, Y, YAW
+            #compute_policy(policy_input)
+            #reward.set_action(rl_action)
+
         input_command = (sensor_data, rl_action)
 
         alip_command = interface.get_command(copy.deepcopy(input_command))
-        command = alip_command[0]
-        rl_trigger = alip_command[1]
-        #obs = sensordata + rl_obs --> in sensor data we need to change sensor data to foot frame
-        rl_obs = alip_command[2]
 
-        #rl_reward = alip_command[3]
-    
+        command = alip_command[0]
+
+        if(rl_trigger[0] == True):
+            rl_trigger = alip_command[1]
+            #obs = sensordata + rl_obs --> in sensor data we need to change sensor base position data to foot frame
+            rl_obs = alip_command[2]
+            #reward.compute_reward(rl_obs) #if it fails and never reaches true no reward will be added
+                                           #the reward is computed at the end of the step in which the policy has been applied.
+                                           #that is when the foot reaches the position specified by the policy
+                                           #Maybe the reward should be computed at the end of the step with the stance leg that is in the policy position
+                                           #like in the mpc
+                                           #ori can just choose the other Lx as target
+
+
+
+
+
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)

@@ -61,11 +61,15 @@ class Draco3StateProvider(metaclass=MetaSingleton):
         #des_com_yaw    #batch x 1
         #Ts             #batch x 1 for now constant
         #Tr             #batch x 1 for now constant = Ts
-        #com coordinates
+        ######################## 6
+        ########### com coordinates
         #com_wrt_stance #batch x 3
         #actual_com_L   #batch x 3
+        ######################## 12
+        ###### the following are not input to the policy
         #stance leg     #batch x 3    position in world frame, so we substract it to base in sensor data
-        #TOTAL SIZE     #batch x 15
+        #torso r, p,yaw #batch x 3  #for reward function
+        #TOTAL SIZE     #batch x 18
 
         #TODO: have a base and com may be redundant?
 
