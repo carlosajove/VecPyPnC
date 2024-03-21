@@ -3,6 +3,8 @@ import numpy as np
 import pybullet as p
 import pybullet_utils.bullet_client as bc
 import pybullet_data
+import torch
+
 
 import os
 import sys
@@ -17,8 +19,10 @@ import shutil
 
 import cv2
 
-from config.draco3_config import SimConfig
-from pnc.draco3_pnc.draco3_interface import Draco3Interface
+from config.draco3_alip_config import SimConfig
+from config.draco3_alip_config import AlipParams
+
+from pnc_pytorch.draco3_pnc.draco3_interface import Draco3Interface
 from util import pybullet_util
 
 GRIPPER_JOINTS = [
@@ -78,7 +82,7 @@ class DracoEnv(gym.Env):
         else:
             self.client = bc.BulletClient(connection_mode=p.DIRECT)
 
-        self.action_space = gym.spaces.Box(
+        self.action_space = gym.spaces.Box(  #maximum and minumni value
             low = np.array([-2, -2, -2]),
             high = np.array([2, 2, 2]),
             dtype = np.float64
@@ -169,19 +173,37 @@ class DracoEnv(gym.Env):
             }
         )"""
 
-        self.observation_space = gym.spaces.Box(
-            low = np.array([-100]*82),
-            high = np.array([100]*82),
+        self.observation_space = gym.spaces.Box(  #observation space
+            low = np.array([-100]*94),
+            high = np.array([100]*94),
             dtype = np.float64
         )
-    
-    def reset(self, seed: int = 0):
+
+        #reward terms
+        self._w_roll_pitch = 0.05
+        self._w_desired_Lxy = 0.1
+        self._w_desired_yaw = 0.1
+        self._w_com_height = 0.05
+        self._w_excessive_fp = 0.05
+        self._w_excessive_angle = 0.05
+        #self._w_termination = -100
+        self._w_alive_bonus = 1.
+
+        self._Lx_main = 0.5*AlipParams.WIDTH*AlipParams.MASS*math.sqrt(AlipParams.G/AlipParams.ZH) \
+                        *AlipParams.ZH*math.tanh(math.sqrt(AlipParams.G/AlipParams.ZH)*AlipParams.TS/2)
+        
+        #initialise old_wbc_obs for reward
+        self._old_wbc_obs = torch.zeros(AlipParams.N_BATCH, 18)
+        self._new_wbc_obs = torch.zeros(AlipParams.N_BATCH, 18)
+
+    def reset(self, seed: int = 0):  #creates env
         # Environment Setup
-        self.client.resetDebugVisualizerCamera(
-            cameraDistance=1.0,
-            cameraYaw=120,
-            cameraPitch=-30,
-            cameraTargetPosition=[1, 0.5, 1.0])
+        if (self.render):
+            self.client.resetDebugVisualizerCamera(
+                cameraDistance=1.0,
+                cameraYaw=120,
+                cameraPitch=-30,
+                cameraTargetPosition=[1, 0.5, 1.0])
         self.client.setGravity(0, 0, -9.8)
         self.client.setPhysicsEngineParameter(
             fixedTimeStep=SimConfig.CONTROLLER_DT, numSubSteps=SimConfig.N_SUBSTEP)
@@ -268,6 +290,7 @@ class DracoEnv(gym.Env):
             "interface" : self.interface,
             }
         obs_numpy  = dict_to_numpy(self.obs)
+        obs_numpy = np.concatenate((obs_numpy, np.zeros(12)))
             
         return obs_numpy, info
     
@@ -276,24 +299,25 @@ class DracoEnv(gym.Env):
 
         # TODO remove printing
 
+        if isinstance(action, np.ndarray):
+            action = torch.from_numpy(action).unsqueeze(0)
         step_flag = False
         while not step_flag:
-            command, step_flag, policy_obs = self.interface.get_command(self.obs) # TODO pass in residual
+            command, step_flag, wbc_obs = self.interface.get_command((self.obs, action)) # TODO pass in residual
         
         self._set_motor_command(command)
 
         self.client.stepSimulation()
         if self.render: time.sleep(SimConfig.CONTROLLER_DT)
 
-        self.obs = self._get_observation()
-        reward = self._compute_reward()
+        self.obs, self.policy_obs = self._get_observation(wbc_obs)
+        reward = self._compute_reward(wbc_obs, action)
         done = self._compute_termination()
         info = {
             "gripper_command" : self.gripper_command,
             }
-        obs_numpy  = dict_to_numpy(self.obs)
 
-        return obs_numpy, reward, done, done, info # need terminated AND truncated
+        return self.policy_obs, reward, done, done, info # need terminated AND truncated
 
     def close(self):
         self.client.disconnect()
@@ -301,10 +325,6 @@ class DracoEnv(gym.Env):
 
     def _set_motor_command(self, command) -> None:
         # Exclude Knee Distal Joints Command
-        del command['joint_pos']['l_knee_fe_jd']
-        del command['joint_pos']['r_knee_fe_jd']
-        del command['joint_vel']['l_knee_fe_jd']
-        del command['joint_vel']['r_knee_fe_jd']
         del command['joint_trq']['l_knee_fe_jd']
         del command['joint_trq']['r_knee_fe_jd']
 
@@ -312,7 +332,7 @@ class DracoEnv(gym.Env):
         pybullet_util.set_motor_trq(self.robot,self.joint_id, command['joint_trq'])
         pybullet_util.set_motor_pos(self.robot,self.joint_id, self.gripper_command)
 
-    def _get_observation(self) -> dict:
+    def _get_observation(self, wbc_obs) -> dict:
 
          # Get SensorData
         obs = pybullet_util.get_sensor_data(self.robot,self.joint_id,self.link_id,
@@ -330,17 +350,72 @@ class DracoEnv(gym.Env):
         obs['b_rf_contact'] = True if rf_height <= 0.01 else False
         obs['b_lf_contact'] = True if lf_height <= 0.01 else False
 
-        return obs
+        wbc_np = wbc_obs[0].numpy()
+        obs_numpy  = dict_to_numpy(self.obs)
+        obs_numpy[0:3] -= wbc_np[12:15]
+        policy_obs = np.concatenate((obs_numpy, wbc_np[0:12]))
+        
+        return obs, policy_obs
     
-    def _compute_reward(self):
-        # TODO
-        # impliment reward terms
-        return 0
+    def _compute_reward(self, wbc_obs, action):
+        self._old_wbc_obs = self._new_wbc_obs
+        self._new_wbc_obs = wbc_obs
+        self._rl_action = action
+
+        reward = self._w_alive_bonus
+        reward += self.reward_tracking_com_L()
+        reward += self.reward_tracking_yaw()
+        reward += self.reward_com_height()
+        reward += self.reward_roll_pitch()
+        reward += self.penalise_excessive_fp()
+        reward += self.penalise_excessive_yaw()
+
+        return reward.squeeze().item()
 
     def _compute_termination(self):
         # TODO
         # impliment termination conditions
         return False
+
+    def reward_tracking_com_L(self):
+        Lx = torch.zeros(AlipParams.N_BATCH, 2)
+        Lx[:, 0] = self._new_wbc_obs[:, 0]*self._Lx_main 
+        #in the code 1 corresponds to current stance foot right
+        # -1 to current stance foot left 
+        # new obs -1 --> ended policy for left foot --> we are at the desired state for end of right stance
+        error = Lx + self._old_wbc_obs[:, 1:3] - self._new_wbc_obs[:, 9:11]  #desired Lx,y - observedLx,y at the end of the step
+        error = torch.sum(torch.square(error), dim = 1)
+        error *= self._w_desired_Lxy
+        return torch.exp(-error)
+    
+    def reward_tracking_yaw(self):
+        error = self._new_wbc_obs[:, 16] - self._old_wbc_obs[:, 16] - self._old_wbc_obs[:, 3]
+        error = torch.square(error)
+        error *= self._w_desired_yaw
+
+        return torch.exp(-error)
+
+    def reward_com_height(self):
+        error = self._new_wbc_obs[:, 8] - AlipParams.ZH
+        error = torch.square(error)
+        error *= self._w_com_height
+        return torch.exp(-error)
+
+    def reward_roll_pitch(self):
+        error = torch.sum(torch.square(self._new_wbc_obs[:, 14:16]), dim = 1)
+        error *= self._w_roll_pitch 
+        return torch.exp(-error)
+    
+    def penalise_excessive_fp(self):
+        error = torch.sum(torch.square(self._rl_action[:, 0:2]), dim = 1)
+        error *= self._w_excessive_fp
+        return torch.exp(-error)
+    
+    def penalise_excessive_yaw(self): 
+        error = torch.square(self._rl_action[:, 2])
+        error *= self._w_excessive_angle
+        return torch.exp(-error)
+
 
 if __name__ == "__main__":
     env = DracoEnv(True)
@@ -352,4 +427,5 @@ if __name__ == "__main__":
     interface = info["interface"]
 
     while True:
-        obs, reward, done, trunc, info = env.step(None)
+        action = torch.zeros(AlipParams.N_BATCH,3)
+        obs, reward, done, trunc, info = env.step(action)
