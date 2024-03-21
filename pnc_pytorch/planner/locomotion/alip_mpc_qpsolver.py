@@ -156,9 +156,10 @@ class ALIPtorch_mpc():
         stleg_pos = torch.where(stance_leg.unsqueeze(1) == 1, rfoot_pos, lfoot_pos)
 
         #stleg_pos = stleg_pos.to(torso_ori.dtype)
-        pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), pos.unsqueeze(2)).squeeze()
-        vel_torso_ori = torch.matmul(torso_ori.transpose(1,2), vel.unsqueeze(2)).squeeze()
-        stleg_pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), stleg_pos.unsqueeze(2)).squeeze()
+        pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), pos.unsqueeze(2)).squeeze(2)
+        vel_torso_ori = torch.matmul(torso_ori.transpose(1,2), vel.unsqueeze(2)).squeeze(2)
+        stleg_pos_torso_ori = torch.matmul(torso_ori.transpose(1,2), stleg_pos.unsqueeze(2)).squeeze(2)
+        
         
         x = pos_torso_ori[:, 0:2] - stleg_pos_torso_ori[:, 0:2]
 

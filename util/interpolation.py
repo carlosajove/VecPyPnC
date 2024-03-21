@@ -246,7 +246,10 @@ class HermiteCurveQuat_torch(object):
         
         mask = torch.where(torch.linalg.norm(self._wa, dim = 1) < 1e-6, True, False)
         idx_plus = torch.nonzero(mask).squeeze().tolist()
+        idx_plus = [idx_plus] if isinstance(idx_plus, int) else idx_plus
         idx_minus = torch.nonzero(~mask).squeeze().tolist()
+        idx_minus = [idx_minus] if isinstance(idx_minus, int) else idx_minus
+
         if len(idx_plus) > 0:
             self._q1[idx_plus] = orbit_util.quat_mul(self._qa[idx_plus], 
                                                      torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(len(idx_plus), 1))
@@ -262,6 +265,10 @@ class HermiteCurveQuat_torch(object):
         mask2 = torch.where(torch.linalg.norm(self._wb, dim = 1) < 1e-6, True, False)
         idx_plus2 = torch.nonzero(mask2).squeeze().tolist()
         idx_minus2 = torch.nonzero(~mask2).squeeze().tolist()
+
+        idx_plus2 = [idx_plus2] if isinstance(idx_plus2, int) else idx_plus2
+        idx_minus2 = [idx_minus2] if isinstance(idx_minus2, int) else idx_minus2
+
         if len(idx_plus2) > 0:
             self._q2[idx_plus2] = orbit_util.quat_mul(self._qb[idx_plus2], 
                                                       torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(len(idx_plus2), 1))
@@ -298,18 +305,24 @@ class HermiteCurveQuat_torch(object):
 
         mask = torch.where(torch.linalg.norm(self._omega_1, dim = 1) > 1e-5, True, False)
         idx_plus = torch.nonzero(mask).squeeze().tolist()
+        idx_plus = [idx_plus] if isinstance(idx_plus, int) else idx_plus
+
         qtmp1 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
         if (len(idx_plus) > 0):
             qtmp1[idx_plus] = util.quat_from_rot_vec(self._b1[idx_plus]*self._omega_1[idx_plus])
 
         mask2 = torch.where(torch.linalg.norm(self._omega_2, dim = 1) > 1e-5, True, False)
         idx_plus2 = torch.nonzero(mask2).squeeze().tolist()
+        idx_plus2 = [idx_plus2] if isinstance(idx_plus2, int) else idx_plus2
+        
         qtmp2 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
         if (len(idx_plus2) > 0):
             qtmp2[idx_plus2] = util.quat_from_rot_vec(self._b2[idx_plus2]*self._omega_2[idx_plus2])
 
         mask3 = torch.where(torch.linalg.norm(self._omega_3, dim = 1) > 1e-5, True, False)
         idx_plus3 = torch.nonzero(mask3).squeeze().tolist()
+        idx_plus3 = [idx_plus3] if isinstance(idx_plus3, int) else idx_plus3
+
         qtmp3 = torch.tensor([1., 0., 0., 0.], dtype = torch.double).repeat(self._n_batch, 1)
         if (len(idx_plus3) > 0):
             qtmp2[idx_plus3] = util.quat_from_rot_vec(self._b2[idx_plus3]*self._omega_2[idx_plus3])

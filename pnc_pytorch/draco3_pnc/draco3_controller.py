@@ -90,8 +90,8 @@ class Draco3Controller(object):
             self._tci_container.task_list, self._tci_container.contact_list,
             self._tci_container.internal_constraint_list)
 
-        joint_trq_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_trq_cmd.unsqueeze(2)).squeeze()
-        joint_acc_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_acc_cmd.unsqueeze(2)).squeeze()
+        joint_trq_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_trq_cmd.unsqueeze(2)).squeeze(2)
+        joint_acc_cmd = torch.bmm(self._sa[:, :, 6:].transpose(1, 2), joint_acc_cmd.unsqueeze(2)).squeeze(2)
 
 
         if PnCConfig.SAVE_DATA:

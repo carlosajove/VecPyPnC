@@ -131,7 +131,9 @@ class Draco3ControlArchitecture(ControlArchitecture):
             # Update State Machine
             self._new_step_list -= 1
             ids_new_step = torch.nonzero(self._new_step_list == 0).squeeze().tolist()
+            ids_new_step = [ids_new_step] if isinstance(ids_new_step, int) else ids_new_step
             ids_one_step = torch.nonzero(self._new_step_list <= 0).squeeze().tolist()
+            ids_one_step = [ids_one_step] if isinstance(ids_one_step, int) else ids_one_step
             if (len(ids_new_step) > 0):
                 self._state_machine[self._state].new_step(ids_new_step, rl_action)
             if (len(ids_one_step) > 0):
