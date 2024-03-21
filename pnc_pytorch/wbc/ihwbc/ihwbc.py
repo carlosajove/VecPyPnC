@@ -340,7 +340,7 @@ class IHWBC(object):
         #printvar("unsqueeze", (self._coriolis + self._gravity).unsqueeze(2))
         #print(torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2)))
         eq_floating_vec = -torch.matmul(
-            self._sf, torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2))).squeeze()
+            self._sf, torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2))).squeeze(2)
 
         #printvar("eq_floating_mat", eq_floating_mat)
         #printvar("eq_int_mat", eq_int_mat)
@@ -516,14 +516,14 @@ class IHWBC(object):
                 torch.bmm(sa_ni_trc_bar_tr, self._snf),
                 torch.matmul(self._mass_matrix, sol_q_ddot.unsqueeze(2)) +
                 torch.matmul(ni.transpose(1,2), (self._coriolis + self._gravity).unsqueeze(2)) -
-                torch.matmul(torch.bmm(contact_jacobian, ni).transpose(1,2), sol_rf.unsqueeze(2))).squeeze()
+                torch.matmul(torch.bmm(contact_jacobian, ni).transpose(1,2), sol_rf.unsqueeze(2))).squeeze(2)
         else:
             joint_trq_cmd = torch.matmul(
                 torch.bmm(sa_ni_trc_bar_tr, self._snf),
                 torch.matmul(self._mass_matrix, sol_q_ddot.unsqueeze(2)) +
-                torch.matmul(ni, (self._coriolis + self._gravity).unsqueeze(2))).squeeze()
+                torch.matmul(ni, (self._coriolis + self._gravity).unsqueeze(2))).squeeze(2)
 
-        joint_acc_cmd = torch.matmul(self._sa, sol_q_ddot.unsqueeze(2)).squeeze()
+        joint_acc_cmd = torch.matmul(self._sa, sol_q_ddot.unsqueeze(2)).squeeze(2)
 
         if verbose:
             # if True:

@@ -96,7 +96,7 @@ class WalkingState(object):
     ALIP = 19
 
 class AlipParams(object):
-    N_BATCH = 2
+    N_BATCH = 1
     TS = 0.2
     NT_qp = 4
     NT_mpc = 1

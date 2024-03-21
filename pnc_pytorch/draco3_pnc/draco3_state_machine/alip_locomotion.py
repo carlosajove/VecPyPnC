@@ -69,7 +69,7 @@ class AlipLocomotion(StateMachine):
         lfoot_pos = self._robot.get_link_iso("l_foot_contact")[ids, 0:3, 3]
 
         turn_ids = torch.nonzero(self._des_com_yaw != 0).squeeze().tolist()
-
+        turn_ids = [turn_ids] if isinstance(turn_ids, int) else turn_ids
         self._trajectory_manager.setNewOri(ids, rl_action[:,2]) #TODO: TRAJECTORY FOR ORI
         torso_ori = self._trajectory_manager.des_torso_rot[ids]
 
@@ -100,6 +100,8 @@ class AlipLocomotion(StateMachine):
         b_rf_contact_h = self._sp.b_rf_contact
 
         rst_id = torch.nonzero(self._stance_leg[ids] == 1).squeeze().tolist()
+        rst_id = [rst_id] if isinstance(rst_id, int) else rst_id
+
         new_rf_z_max_rfoot[rst_id] = self._rf_z_MAX[rst_id]
         new_rf_z_max_lfoot[rst_id] = self._rf_z_max[rst_id]
         for i in rst_id:
@@ -107,6 +109,8 @@ class AlipLocomotion(StateMachine):
             b_rf_contact_h[i] = True
 
         lst_id = torch.nonzero(self._stance_leg[ids] ==-1).squeeze().tolist()
+        lst_id = [lst_id] if isinstance(lst_id, int) else lst_id
+
         new_rf_z_max_lfoot[lst_id] = self._rf_z_MAX[lst_id]
         new_rf_z_max_rfoot[lst_id] = self._rf_z_max[lst_id]
         for i in lst_id:
@@ -125,7 +129,11 @@ class AlipLocomotion(StateMachine):
         self._state_machine_time = self._sp.curr_time - self._state_machine_start_time
         t = self._state_machine_time + self._Tr - self._Ts
         turn_ids = torch.nonzero(self._des_com_yaw[ids] != 0).squeeze().tolist()
+        turn_ids = [turn_ids] if isinstance(turn_ids, int) else turn_ids
+
         not_turn_ids = torch.nonzero(self._des_com_yaw[ids] == 0).squeeze().tolist()
+        not_turn_ids = [not_turn_ids] if isinstance(not_turn_ids, int) else not_turn_ids
+
         self._trajectory_manager.updateDesired(t, ids, turn_ids, not_turn_ids)
 
     def switchLeg(self, new_step_list):
@@ -139,6 +147,7 @@ class AlipLocomotion(StateMachine):
         cond2 = torch.where(swing_leg_height < 0.0005, True, False)#* torch.ones(self._n_batch, dtype = torch.double)
         cond = torch.logical_and(cond1, cond2)
         indices = torch.nonzero(cond).squeeze().tolist()
+        indices = [indices] if isinstance(indices, int) else indices
         #res = torch.zeros(self._n_batch)
 
         if (len(indices) > 0):
