@@ -15,13 +15,13 @@ class Draco3TCIContainer(TCIContainer):
         # Initialize Task
         # ======================================================================
         # COM Task
-        self._com_task = BasicTask(robot, "COM", 3, self.n_batch, 'com', PnCConfig.SAVE_DATA)
+        self._com_task = BasicTask(robot, "COM", 3, 3, self.n_batch, 'com', PnCConfig.SAVE_DATA)
         self._com_task.kp = WBCConfig.KP_COM 
         self._com_task.kd = WBCConfig.KD_COM 
         self._com_task.w_hierarchy = WBCConfig.W_COM * torch.ones(self.n_batch)
 
         # Torso orientation task
-        self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
+        self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3, 4, self.n_batch,
                                          "torso_com_link", PnCConfig.SAVE_DATA)
         self._torso_ori_task.kp = WBCConfig.KP_TORSO 
         self._torso_ori_task.kd = WBCConfig.KD_TORSO 
@@ -35,35 +35,35 @@ class Draco3TCIContainer(TCIContainer):
             'r_wrist_pitch'
         ]
         self._upper_body_task = BasicTask(robot, "SELECTED_JOINT",
-                                          len(upperbody_joint), self.n_batch,
-                                          upperbody_joint, PnCConfig.SAVE_DATA)
+                                          len(upperbody_joint), len(upperbody_joint),
+                                          self.n_batch, upperbody_joint, PnCConfig.SAVE_DATA)
         self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY 
         self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY 
         self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY * torch.ones(self.n_batch)
 
         # Rfoot Pos Task
-        self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, self.n_batch,
+        self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, 3, self.n_batch,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._rfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Lfoot Pos Task
-        self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, self.n_batch,
+        self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3, 3, self.n_batch,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
         self._lfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._lfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Rfoot Ori Task
-        self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
+        self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, 4, self.n_batch,
                                          "r_foot_contact", PnCConfig.SAVE_DATA)
         self._rfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._rfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT * torch.ones(self.n_batch)
 
         # Lfoot Ori Task
-        self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, self.n_batch,
+        self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3, 4, self.n_batch,
                                          "l_foot_contact", PnCConfig.SAVE_DATA)
         self._lfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._lfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI

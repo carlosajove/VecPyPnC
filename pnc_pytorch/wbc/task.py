@@ -9,11 +9,11 @@ class Task(abc.ABC):
     Usage:
         update_desired --> update_jacobian --> update_cmd
     """
-    def __init__(self, robot, dim, n_batch):
+    def __init__(self, robot, dim, pos_dim, n_batch):
         self._robot = robot
         self._dim = dim
+        self._pos_dim = pos_dim
         self.n_batch = n_batch
-
         self._w_hierarchy = torch.ones(self.n_batch, dtype = torch.double)
 
         self._kp = torch.zeros(self._dim, dtype = torch.double)  #kp and kd will be the same fro all robots
@@ -23,9 +23,9 @@ class Task(abc.ABC):
         self._jacobian_dot_q_dot = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
 
         self._op_cmd = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
-        self._pos_err = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
+        self._pos_err = torch.zeros(self.n_batch, self._pos_dim, dtype = torch.double)
 
-        self._pos_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
+        self._pos_des = torch.zeros(self.n_batch, self._pos_dim, dtype = torch.double)
         self._vel_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
         self._acc_des = torch.zeros(self.n_batch, self._dim, dtype = torch.double)
 

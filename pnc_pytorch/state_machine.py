@@ -2,13 +2,14 @@ import abc
 
 
 class StateMachine(abc.ABC):
-    def __init__(self, state_id, robot):
+    def __init__(self, state_id, robot, verbose):
         """
         Parameters
         ----------
         state_id (int): State id
         robot (RobotSystem)
         """
+        self._verbose = verbose
         self._robot = robot
         self._state_machine_time = 0.
         self._state_id = state_id

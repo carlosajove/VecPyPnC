@@ -97,7 +97,7 @@ class ALIPtrajectoryManager(object):
         
 
         self.des_ori_torso[ids] = orbit_util.convert_quat(orbit_util.quat_from_matrix(self._des_torso_rot[ids]))
-        residual_rl_yaw /= 180/math.pi
+        #residual is in radians
         residual_quat = orbit_util.convert_quat(
                                         orbit_util.quat_from_euler_xyz(torch.zeros(len(ids)),
                                                                        torch.zeros(len(ids)),
@@ -203,6 +203,7 @@ class ALIPtrajectoryManager(object):
         des_lfoot_pos = torch.where(self._stance_leg[ids].unsqueeze(1) == 1, self.des_sw_foot_pos[ids], lfootpos)
         des_lfoot_vel = torch.where(self._stance_leg[ids].unsqueeze(1) == 1, self.des_sw_foot_vel[ids], torch.zeros(self._n_batch, 3, dtype = torch.double))
         des_lfoot_acc = torch.where(self._stance_leg[ids].unsqueeze(1) == 1, self.des_sw_foot_acc[ids], torch.zeros(self._n_batch, 3, dtype = torch.double))
+
         self._rfoot_task.update_desired(des_rfoot_pos, des_rfoot_vel, des_rfoot_acc, ids)
         self._lfoot_task.update_desired(des_lfoot_pos, des_lfoot_vel, des_lfoot_acc, ids)
 

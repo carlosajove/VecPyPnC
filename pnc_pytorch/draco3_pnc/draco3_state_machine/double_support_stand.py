@@ -9,11 +9,11 @@ from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
 class DoubleSupportStand(StateMachine):
-    def __init__(self, batch, id, tm, fm, robot):
-        super(DoubleSupportStand, self).__init__(id, robot)
+    def __init__(self, batch, id, tm, fm, robot, verbose = False):
+        super(DoubleSupportStand, self).__init__(id, robot, verbose)
         self._n_batch = batch
         self._trajectory_managers = tm
-        self._force_managers = fm
+        self._force_managers = fm   
         self._end_time = 0.
         self._rf_z_max_time = torch.zeros(self._n_batch)
         self._com_height_des = torch.zeros(self._n_batch)
@@ -45,7 +45,8 @@ class DoubleSupportStand(StateMachine):
         self._com_height_des = val
 
     def first_visit(self):
-        print("[WalkingState] STAND")
+        if self._verbose:
+            print("[WalkingState] STAND")
         self._start_time = self._sp.curr_time 
 
         # Initialize CoM Trajectory
