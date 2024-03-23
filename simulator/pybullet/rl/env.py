@@ -23,7 +23,7 @@ from config.draco3_alip_config import SimConfig
 from config.draco3_alip_config import AlipParams
 
 from pnc_pytorch.draco3_pnc.draco3_interface import Draco3Interface
-from util import pybullet_util
+from util import pybullet_util_rl
 
 GRIPPER_JOINTS = [
     "left_ezgripper_knuckle_palm_L1_1", "left_ezgripper_knuckle_L1_L2_1",
@@ -81,10 +81,10 @@ class DracoEnv(gym.Env):
             self.client.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
         else:
             self.client = bc.BulletClient(connection_mode=p.DIRECT)
-
+        
         self.action_space = gym.spaces.Box(  #maximum and minumni value
-            low = np.array([-2, -2, -2]),
-            high = np.array([2, 2, 2]),
+            low = np.array([-0.1, -0.1, -0.1]),
+            high = np.array([0.1, 0.1, 0.1]),
             dtype = np.float64
         )
         
@@ -181,13 +181,14 @@ class DracoEnv(gym.Env):
 
         #reward terms
         self._w_roll_pitch = 0.05
-        self._w_desired_Lxy = 0.1
-        self._w_desired_yaw = 0.1
         self._w_com_height = 0.05
+
+        self._w_desired_Lxy = 0.05
+        self._w_desired_yaw = 0.05
         self._w_excessive_fp = 0.05
         self._w_excessive_angle = 0.05
-        #self._w_termination = -100
-        self._w_alive_bonus = 1.
+        self._w_termination = -4
+        self._w_alive_bonus = 0.5
 
         self._Lx_main = 0.5*AlipParams.WIDTH*AlipParams.MASS*math.sqrt(AlipParams.G/AlipParams.ZH) \
                         *AlipParams.ZH*math.tanh(math.sqrt(AlipParams.G/AlipParams.ZH)*AlipParams.TS/2)
@@ -198,6 +199,7 @@ class DracoEnv(gym.Env):
 
     def reset(self, seed: int = 0):  #creates env
         # Environment Setup
+        self.client.resetSimulation()
         if (self.render):
             self.client.resetDebugVisualizerCamera(
                 cameraDistance=1.0,
@@ -221,9 +223,9 @@ class DracoEnv(gym.Env):
 
         self.client.loadURDF(cwd + "/robot_model/ground/plane.urdf", [0, 0, 0])
         self.client.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        nq, nv, na,self.joint_id,self.link_id, self.pos_basejoint_to_basecom, self.rot_basejoint_to_basecom = pybullet_util.get_robot_config(
+        nq, nv, na,self.joint_id,self.link_id, self.pos_basejoint_to_basecom, self.rot_basejoint_to_basecom = pybullet_util_rl.get_robot_config(
             self.robot, SimConfig.INITIAL_POS_WORLD_TO_BASEJOINT,
-            SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT, SimConfig.PRINT_ROBOT_INFO)
+            SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT, SimConfig.PRINT_ROBOT_INFO,  client = self.client)
 
         # Add Gear constraint
         c = self.client.createConstraint(
@@ -252,18 +254,18 @@ class DracoEnv(gym.Env):
         set_initial_config(self.robot, self.joint_id, self.client)
 
         # Link Damping
-        pybullet_util.set_link_damping(self.robot, self.link_id.values(), 0., 0.)
+        pybullet_util_rl.set_link_damping(self.robot, self.link_id.values(), 0., 0., client=self.client)
 
         # Joint Friction
-        pybullet_util.set_joint_friction(self.robot,self.joint_id, 0.)
+        pybullet_util_rl.set_joint_friction(self.robot,self.joint_id, 0., client=self.client)
         gripper_attached_joint_id = OrderedDict()
         gripper_attached_joint_id["l_wrist_pitch"] = self.joint_id["l_wrist_pitch"]
         gripper_attached_joint_id["r_wrist_pitch"] = self.joint_id["r_wrist_pitch"]
-        pybullet_util.set_joint_friction(self.robot, gripper_attached_joint_id, 0.1)
+        pybullet_util_rl.set_joint_friction(self.robot, gripper_attached_joint_id, 0.1, client=self.client)
 
-        nominal_sensor_data = pybullet_util.get_sensor_data(
+        nominal_sensor_data = pybullet_util_rl.get_sensor_data(
         self.robot,self.joint_id,self.link_id, self.pos_basejoint_to_basecom,
-        self.rot_basejoint_to_basecom)
+        self.rot_basejoint_to_basecom, client=self.client)
 
         self.gripper_command = dict()
         for gripper_joint in GRIPPER_JOINTS:
@@ -276,10 +278,10 @@ class DracoEnv(gym.Env):
             del self.obs['joint_pos'][gripper_joint]
             del self.obs['joint_vel'][gripper_joint]
 
-        rf_height = pybullet_util.get_link_iso(self.robot,
-                                              self.link_id['r_foot_contact'])[2, 3]
-        lf_height = pybullet_util.get_link_iso(self.robot,
-                                              self.link_id['l_foot_contact'])[2, 3]
+        rf_height = pybullet_util_rl.get_link_iso(self.robot,
+                                              self.link_id['r_foot_contact'], client=self.client)[2, 3]
+        lf_height = pybullet_util_rl.get_link_iso(self.robot,
+                                              self.link_id['l_foot_contact'], client=self.client)[2, 3]
         self.obs['b_rf_contact'] = True if rf_height <= 0.01 else False
         self.obs['b_lf_contact'] = True if lf_height <= 0.01 else False
 
@@ -291,7 +293,7 @@ class DracoEnv(gym.Env):
             }
         obs_numpy  = dict_to_numpy(self.obs)
         obs_numpy = np.concatenate((obs_numpy, np.zeros(12)))
-            
+        
         return obs_numpy, info
     
     def step(self, action):
@@ -301,21 +303,29 @@ class DracoEnv(gym.Env):
 
         if isinstance(action, np.ndarray):
             action = torch.from_numpy(action).unsqueeze(0)
-        step_flag = False
-        while not step_flag:
-            command, step_flag, wbc_obs = self.interface.get_command((self.obs, action)) # TODO pass in residual
-        
-        self._set_motor_command(command)
+        step_flag = [False]
+        wbc_obs = None
+        while not step_flag[0]:
+            self.obs, self.policy_obs = self._get_observation(wbc_obs)
 
-        self.client.stepSimulation()
-        if self.render: time.sleep(SimConfig.CONTROLLER_DT)
+            command, step_flag, wbc_obs = self.interface.get_command((self.obs, action)) # TODO pass in residual
+            self._set_motor_command(command)
+            self.client.stepSimulation()
+            if self.render: time.sleep(SimConfig.CONTROLLER_DT)
+            done = self._compute_termination(wbc_obs)
+            if done: break
+
 
         self.obs, self.policy_obs = self._get_observation(wbc_obs)
-        reward = self._compute_reward(wbc_obs, action)
-        done = self._compute_termination()
+
+
+            
+
+        reward = self._compute_reward(wbc_obs, action, done)
         info = {
             "gripper_command" : self.gripper_command,
             }
+
 
         return self.policy_obs, reward, done, done, info # need terminated AND truncated
 
@@ -329,35 +339,44 @@ class DracoEnv(gym.Env):
         del command['joint_trq']['r_knee_fe_jd']
 
         # Apply Command
-        pybullet_util.set_motor_trq(self.robot,self.joint_id, command['joint_trq'])
-        pybullet_util.set_motor_pos(self.robot,self.joint_id, self.gripper_command)
+        pybullet_util_rl.set_motor_trq(self.robot,self.joint_id, command['joint_trq'], client=self.client)
+        pybullet_util_rl.set_motor_pos(self.robot,self.joint_id, self.gripper_command, client=self.client)
 
-    def _get_observation(self, wbc_obs) -> dict:
+    def _get_observation(self, wbc_obs = None) -> dict:
 
          # Get SensorData
-        obs = pybullet_util.get_sensor_data(self.robot,self.joint_id,self.link_id,
+        obs = pybullet_util_rl.get_sensor_data(self.robot,self.joint_id,self.link_id,
                                                     self.pos_basejoint_to_basecom,
-                                                    self.rot_basejoint_to_basecom)
+                                                    self.rot_basejoint_to_basecom, client=self.client)
         
         for gripper_joint in GRIPPER_JOINTS:
             del obs['joint_pos'][gripper_joint]
             del obs['joint_vel'][gripper_joint]
 
-        rf_height = pybullet_util.get_link_iso(self.robot,
-                                              self.link_id['r_foot_contact'])[2, 3]
-        lf_height = pybullet_util.get_link_iso(self.robot,
-                                              self.link_id['l_foot_contact'])[2, 3]
+        rf_height = pybullet_util_rl.get_link_iso(self.robot,
+                                              self.link_id['r_foot_contact'], client=self.client)[2, 3]
+        lf_height = pybullet_util_rl.get_link_iso(self.robot,
+                                              self.link_id['l_foot_contact'], client=self.client)[2, 3]
         obs['b_rf_contact'] = True if rf_height <= 0.01 else False
         obs['b_lf_contact'] = True if lf_height <= 0.01 else False
 
-        wbc_np = wbc_obs[0].numpy()
-        obs_numpy  = dict_to_numpy(self.obs)
-        obs_numpy[0:3] -= wbc_np[12:15]
-        policy_obs = np.concatenate((obs_numpy, wbc_np[0:12]))
-        
+        if wbc_obs is not None:
+            obs_numpy  = dict_to_numpy(self.obs)
+            wbc_np = wbc_obs[0].numpy()
+            obs_numpy  = dict_to_numpy(self.obs)
+            obs_numpy[0:3] -= wbc_np[12:15]
+            policy_obs = np.concatenate((obs_numpy, wbc_np[0:12]))
+        else:
+            policy_obs = None
         return obs, policy_obs
     
-    def _compute_reward(self, wbc_obs, action):
+    def _compute_termination(self, _wbc_obs):
+        #TODO: add more termination
+        condition = torch.any((_wbc_obs[:, 8] < 0.5) | (_wbc_obs[:, 8] > 0.8))  #0.69
+        return condition
+        #return False
+
+    def _compute_reward(self, wbc_obs, action, done):
         self._old_wbc_obs = self._new_wbc_obs
         self._new_wbc_obs = wbc_obs
         self._rl_action = action
@@ -369,13 +388,9 @@ class DracoEnv(gym.Env):
         reward += self.reward_roll_pitch()
         reward += self.penalise_excessive_fp()
         reward += self.penalise_excessive_yaw()
+        if done: reward -= self._w_termination
 
         return reward.squeeze().item()
-
-    def _compute_termination(self):
-        # TODO
-        # impliment termination conditions
-        return False
 
     def reward_tracking_com_L(self):
         Lx = torch.zeros(AlipParams.N_BATCH, 2)
@@ -421,11 +436,15 @@ if __name__ == "__main__":
     env = DracoEnv(True)
 
     from stable_baselines3.common.env_checker import check_env
-    check_env(env)
+    #check_env(env)
 
     obs, info = env.reset()
     interface = info["interface"]
 
     while True:
-        action = torch.zeros(AlipParams.N_BATCH,3)
+        action = torch.ones(AlipParams.N_BATCH,3)
         obs, reward, done, trunc, info = env.step(action)
+        if done: 
+            obs,info = env.reset()
+
+

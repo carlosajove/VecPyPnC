@@ -20,6 +20,9 @@ class MetaSingleton(type):
 
 class Draco3StateProvider(metaclass=MetaSingleton):
     def __init__(self, robot, batch):
+        self.reset(robot, batch)
+
+    def reset(self, robot, batch):
         self._robot = robot
         self._batch = batch
         #TODO: check nominal joint pos ordered Dict

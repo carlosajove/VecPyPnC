@@ -14,8 +14,8 @@ def printvar(a, b):
 
 
 class BasicTask(Task):
-    def __init__(self, robot, task_type, dim, n_batch, target_id=None, data_save=False):
-        super(BasicTask, self).__init__(robot, dim, n_batch)
+    def __init__(self, robot, task_type, dim, pos_dim, n_batch, target_id=None, data_save=False):
+        super(BasicTask, self).__init__(robot, dim, pos_dim, n_batch)
 
         self._target_id = target_id
         self._task_type = task_type

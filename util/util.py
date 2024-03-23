@@ -6,7 +6,7 @@ import json
 import configparser
 
 import multiprocessing as mp
-from tqdm import tqdm
+#from tqdm import tqdm
 from util import orbit_util
 
 import torch 
@@ -186,7 +186,6 @@ def denormalize(x, mean, std):
 def print_attrs(ob):
     attr = vars(ob)
     print(", \n".join("%s: %s" % item for item in attr.items()))
-
 
 def try_multiprocess(args_list, num_cpu, f, max_timeouts=1):
     """

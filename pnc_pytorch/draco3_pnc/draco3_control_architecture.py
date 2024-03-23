@@ -106,13 +106,13 @@ class Draco3ControlArchitecture(ControlArchitecture):
             WalkingState.BALANCE, self._alip_tm, robot)
         
         # Set Starting State
+        #self._state = WalkingState.STAND
         self._state = WalkingState.STAND
         self._prev_state = WalkingState.STAND
         self._b_state_first_visit = True
 
         self._sp = Draco3StateProvider()
 
-        self._alip_iter = 0
         self._new_step_list = torch.ones(self._n_batch) # each get_command substracts 1
                                                         # switch_leg set ids to 3 --> tunable parameter
                                                         # new step is computed for ids == 0
@@ -129,7 +129,6 @@ class Draco3ControlArchitecture(ControlArchitecture):
             self._b_state_first_visit = False
         if(self._state == WalkingState.ALIP):
             # Update State Machine
-            self._new_step_list -= 1
             ids_new_step = torch.nonzero(self._new_step_list == 0).squeeze().tolist()
             ids_new_step = [ids_new_step] if isinstance(ids_new_step, int) else ids_new_step
             ids_one_step = torch.nonzero(self._new_step_list <= 0).squeeze().tolist()
@@ -138,6 +137,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
                 self._state_machine[self._state].new_step(ids_new_step, rl_action)
             if (len(ids_one_step) > 0):
                 self._state_machine[self._state].one_step(ids_one_step)
+            self._new_step_list -= 1
 
             # Update State Machine Independent Trajectories
             self._upper_body_tm.use_nominal_upper_body_joint_pos(
@@ -148,6 +148,7 @@ class Draco3ControlArchitecture(ControlArchitecture):
 
             #RL COMMANDS
             rl_trigger = torch.where(self._new_step_list == 0, True, False).squeeze().tolist()
+            rl_trigger = [rl_trigger] if not isinstance(rl_trigger, list) else rl_trigger
 
         else: 
              # Update State Machine
@@ -159,7 +160,6 @@ class Draco3ControlArchitecture(ControlArchitecture):
             command = self._draco3_controller.get_command()
 
             if self._state_machine[self._state].end_of_state():
-                print("END", "%"*80)
                 self._state_machine[self._state].last_visit()
                 self._prev_state = self._state
                 self._state = self._state_machine[self._state].get_next_state()

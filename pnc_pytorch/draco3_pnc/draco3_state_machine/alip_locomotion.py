@@ -20,7 +20,7 @@ Control fREQ
 """
 
 class AlipLocomotion(StateMachine):
-    def __init__(self, batch, id, tm, alip_mpc, tci_container, robot, data_save = False):
+    def __init__(self, batch, id, tm, alip_mpc, tci_container, robot, data_save = False, verbose = False):
         self._script_dir= os.path.dirname(os.path.realpath(__file__))
         self._n_batch = batch
         self._robot = robot
@@ -71,20 +71,20 @@ class AlipLocomotion(StateMachine):
         turn_ids = torch.nonzero(self._des_com_yaw != 0).squeeze().tolist()
         turn_ids = [turn_ids] if isinstance(turn_ids, int) else turn_ids
         self._trajectory_manager.setNewOri(ids, rl_action[:,2]) #TODO: TRAJECTORY FOR ORI
+        #self._trajectory_manager.setNewOri(ids, torch.zeros(1, dtype = torch.double))
         torso_ori = self._trajectory_manager.des_torso_rot[ids]
 
 
         
         self._swfoot_end = self._alip_mpc.solve_inertia_coor(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], self._Tr[ids], torso_ori,
                                                              com_pos, com_vel, lfoot_pos, rfoot_pos, turn_ids)
-        
         """ One step ahead
         self._swfoot_end = self.solve_inertia_coor(self._stance_leg[ids], self._Lx_offset[ids], self._Ly_des[ids], self._Tr[ids], torso_ori,
                                                              com_pos, com_vel, lfoot_pos, rfoot_pos, turn_ids)
         """
         
         #RL policy
-        self._swfoot_end += rl_action[:, 0:1]
+        self._swfoot_end[:, 0:2] += rl_action[:, 0:2]
 
 
         #Safety Projection
@@ -133,7 +133,6 @@ class AlipLocomotion(StateMachine):
 
         not_turn_ids = torch.nonzero(self._des_com_yaw[ids] == 0).squeeze().tolist()
         not_turn_ids = [not_turn_ids] if isinstance(not_turn_ids, int) else not_turn_ids
-
         self._trajectory_manager.updateDesired(t, ids, turn_ids, not_turn_ids)
 
     def switchLeg(self, new_step_list):
@@ -163,7 +162,6 @@ class AlipLocomotion(StateMachine):
             self._tci_container.contact_list[1].rf_z_max = lfoot_rf_max
             if self._b_data_save:
                 self._data_saver.add('leg_switch_time', (indices, self._sp.curr_time))
-
         self._sp.stance_leg = self._stance_leg
         return new_step_list
 

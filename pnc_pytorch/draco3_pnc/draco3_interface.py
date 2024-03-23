@@ -35,6 +35,7 @@ class Draco3Interface(Interface):
             raise ValueError("wrong dynamics library")
 
         self._sp = Draco3StateProvider(self._robot, self._n_batch)
+        self._sp.reset(self._robot, self._n_batch)
         self._se = Draco3StateEstimator(self._robot, self._n_batch)
         self._control_architecture = Draco3ControlArchitecture(self._robot, self._n_batch)
         self._interrupt_logic = Draco3InterruptLogic(
@@ -48,7 +49,7 @@ class Draco3Interface(Interface):
             self._data_saver.add('joint_trq_limit',
                                  self._robot.joint_trq_limit)
 
-    def get_command(self, input_command):
+    def get_command(self, input_command, verbose = False):
         if PnCConfig.SAVE_DATA:
             self._data_saver.add('time', self._running_time)
             self._data_saver.add('phase', self._control_architecture.state)
@@ -56,16 +57,17 @@ class Draco3Interface(Interface):
         sensor_data = input_command[0]
         rl_action = input_command[1]
         # Update State Estimator
-        if self._count == 0:
+        if self._count == 0 and verbose:
             print("=" * 80)
             print("Initialize")
             print("=" * 80)
+        if self._count == 0:
             self._se.initialize(sensor_data)
         self._se.update(sensor_data)
         self._se.inertia_to_com_torso_coor()
 
         # Process Interrupt Logic
-        self._interrupt_logic.process_interrupts()
+        #self._interrupt_logic.process_interrupts()
 
         # Compute Cmd
         command, trigger, rl_obs = self._control_architecture.get_command(rl_action)

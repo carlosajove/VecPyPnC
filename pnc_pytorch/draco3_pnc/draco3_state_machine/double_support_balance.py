@@ -6,8 +6,8 @@ from pnc_pytorch.draco3_pnc.draco3_state_provider import Draco3StateProvider
 
 
 class DoubleSupportBalance(StateMachine):
-    def __init__(self, batch, id, tm, robot):
-        super(DoubleSupportBalance, self).__init__(id, robot)
+    def __init__(self, batch, id, tm, robot, verbose = False):
+        super(DoubleSupportBalance, self).__init__(id, robot, verbose)
         self._n_batch = batch
         self._trajectory_managers = tm
         self._sp = Draco3StateProvider()
@@ -29,7 +29,8 @@ class DoubleSupportBalance(StateMachine):
         self._trajectory_managers.use_both_current()
 
     def first_visit(self):
-        print("[WalkingState] BALANCE")
+        if self._verbose:
+            print("[WalkingState] BALANCE")
         self._walking_trigger = False
         self._start_time = self._sp.curr_time
 
@@ -39,7 +40,8 @@ class DoubleSupportBalance(StateMachine):
     def end_of_state(self):
         if (self._walking_trigger) :
             return True
-        return False
+        #when alip
+        return True
 
     def get_next_state(self):
         return WalkingState.ALIP
