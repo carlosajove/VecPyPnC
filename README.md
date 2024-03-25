@@ -1,44 +1,39 @@
-# PyPnC
-PyPnC is a python library designed for generating trajectories for a robot
-system and stabilizing the system over the trajectories.
+# VecPyPnC
 
-## Installation
-- Install [anaconda](https://docs.anaconda.com/anaconda/install/)
-- Clone the repository:<br/>
-```$ git clone https://github.com/junhyeokahn/PyPnC.git```
-- Create a virtual environment and install dependancies:<br/>
-```$ conda env create -f pypnc.yml```
-- Activate the environment:<br/>
-```$ conda activate pypnc```
+Vectorized PyTorch implementation of the [PyPnC](https://github.com/junhyeokahn/PyPnC) planning and control
+stack for the Draco3 humanoid, enabling batched simulation for reinforcement learning on top of a
+model-based controller.
 
-## Running Examples
-### Three Link Manipulator Control with Operational Space Control
-- Run the code:<br/>
-```$ python simulator/pybullet/manipulator_main.py```
-### Atlas Walking Control with DCM planning and IHWBC
-- Run the code:<br/>
-```$ python simulator/pybullet/atlas_dynamics_main.py```
-- Send walking commands through keystroke interface. For example, press ```8``` for forward walking, press ```5``` for in-place walking, press ```4``` for leftward walking, press ```6``` for rightward walking, press ```2``` for backward walking, press ```7``` for ccw turning, and press ```9``` for cw turning.
-- Plot the results:<br/>
-```$ python plot/atlas/plot_task.py --file=data/history.pkl```
-### Atlas Locomotion Planning with TOWR+
-- For TOWR+, install additional dependancy [ifopt](https://github.com/ethz-adrl/ifopt)
-- Train a Composite Rigid Body Inertia network and generate files for optimization:<br/>
-```$ python simulator/pybullet/atlas_crbi_trainer.py``` and press ```5``` for training
-- Run ```TOWR+```:<br/>
-```$ mkdir build && cd build && cmake .. && make -j6 && ./atlas_forward_walk```
-- Plot the optimized trajectory:<br/>
-```$ python plot/plot_towr_plus_trajectory.py --file=data/atlas_forward_walk.yaml --crbi_model_path=data/tf_model/atlas_crbi```
-- Replay the optimized trajectory with the robot:<br/>
-```$ python simulator/pybullet/atlas_kinematics_main.py --file=data/atlas_forward_walk.yaml```
+## Overview
 
-## Citation
+| Path | Contents |
+|---|---|
+| `pnc_pytorch/planner/locomotion` | ALIP footstep MPC and swing-foot trajectories |
+| `pnc_pytorch/wbc/ihwbc` | Implicit-hierarchy whole-body control |
+| `pnc_pytorch/draco3_pnc` | Draco3 control architecture and state machine |
+| `simulator/pybullet/rl`, `rl_model/` | RL environment and PPO training |
+
+The original PyPnC code is kept alongside.
+
+## Usage
+
+```sh
+conda env create -f pypnc.yml && conda activate pypnc_pytorch
+pip install gymnasium stable-baselines3      # for RL only
+
+python simulator/pybullet/draco3_pytorch.py  # batched controller in PyBullet
+python simulator/pybullet/rl/train.py        # PPO training
 ```
-@article{10.3389/frobt.2021.712239,
-	author = {Ahn, Junhyeok and Jorgensen, Steven Jens and Bang, Seung Hyeon and Sentis, Luis},
-	journal = {Frontiers in Robotics and AI},
-	pages = {257},
-	title = {Versatile Locomotion Planning and Control for Humanoid Robots},
-	volume = {8},
-	year = {2021}}
+
+## Credits
+
+Based on PyPnC by Junhyeok Ahn et al.:
+
+```bibtex
+@article{ahn2021versatile,
+  title={Versatile Locomotion Planning and Control for Humanoid Robots},
+  author={Ahn, Junhyeok and Jorgensen, Steven and Bang, Seung Hyeon and Sentis, Luis},
+  journal={Frontiers in Robotics and AI},
+  year={2021}
+}
 ```
